@@ -1,4 +1,5 @@
 import os, gzip
+from glob import glob
 
 from scipy.interpolate import interp1d, interp2d
 from scipy.optimize import fsolve, fmin
@@ -89,7 +90,7 @@ class sxdf(object):
         # interpolate pressure ??
         # Include printed output so user know what is going on.
 
-        
+
         
 ##########################################################################################################################################################
 ##########################################################################################################################################################
@@ -150,28 +151,6 @@ def applyLag(x,time,N):
 
     _fn = interp1d(i_time, i_x, bounds_error=False, fill_value=np.NaN)
     return _fn(time)
-
-def correctSalinity(conductivity,temperature,pressure,time,lag=None):
-    time = date2float(time)
-
-    def _salinityCorrection(x):
-        _temperature_internal = temperature + (x * np.gradient(temperature,time))
-        return gsw.conversions.SP_from_C(conductivity,_temperature_internal,pressure)
-        
-    if lag is None:
-        from scipy import optimize 
-        def _PolyArea(x,y):
-            _gg = np.isfinite(x+y) 
-            return 0.5*np.abs(np.dot(x[_gg],np.roll(y[_gg],1))-np.dot(y[_gg],np.roll(x[_gg],1)))
-            # Doesn't work well with intersecting polygon.... Problem??
-        def _f(x):
-            return _PolyArea(_salinityCorrection(x),temperature)
-        print('Regressing lag coefficient for salinity thermal hysteresis correction:')
-        minimum = optimize.fmin(_f, 0.5, disp=True, full_output=True)
-        print('Salinity lag coefficient = '+np.array2string(minimum[0]))
-        lag = minimum[0]
-
-    return _salinityCorrection(lag)
 
 def correctSalinityGarau(data,coefs=None):
     if 'speed' in data.data:
@@ -290,6 +269,8 @@ def lagCorrection(variable,referencevariable,time,lag=None):
         lag = minimum[0]
 
     return _Correction(lag)
+
+
 
 ##########################################################################################################################################################
 ##########################################################################################################################################################
