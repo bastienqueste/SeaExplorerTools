@@ -1,5 +1,4 @@
 import os, gzip
-from glob import glob
 
 from scipy.interpolate import interp1d, interp2d
 from scipy.optimize import fsolve, fmin
@@ -8,44 +7,47 @@ import pandas as pd
 import numpy as np
 import gsw
 
+from glob import glob
 from tqdm import tqdm
 
 ###########################
 #    SX PANDAS DF CLASS   #
 ###########################               
 class sxdf(object):
-    def __init__(self, *args):
+    def __init__(self, *args, gzipped=True):
         self.data = pd.DataFrame()
         for arg in args:
             if type(arg) is list:
                 for k in arg:
-                    self.load_gzfiles(k)
+                    self.load_files(k, gzipped=gzipped)
             else:
-                self.load_gzfiles(arg)
+                self.load_files(arg, gzipped=gzipped)
 
-    def load_gzfiles(self, file_dir):
+    def load_files(self, file_dir, gzipped=True):
         ''' Load payload data into one dataframe and convert main timestamp to datetime format. '''
         
-        if type(file_dir) == tuple:
-            import re
-            file_list = np.array(os.listdir(file_dir[0]))
-            file_list = file_list[ [(fn.split('.')[-1] == 'gz') for fn in file_list] ]
-            file_list = file_list[ [(len(fn.split('.')) == 6) for fn in file_list] ]
-            file_list = [string for string in file_list if re.search(file_dir[1], string)]
-            file_dir = file_dir[0]
-        else:
-            file_list = np.array(os.listdir(file_dir))
-            file_list = file_list[ [(fn.split('.')[-1] == 'gz') for fn in file_list] ]
-            file_list = file_list[ [(len(fn.split('.')) == 6) for fn in file_list] ]
+        file_list = glob(file_dir)
+        # print(file_list)
         
-        print(file_list)
+        def extract_gzipped(filename):
+            f = gzip.open(fileName)
+            dive = pd.read_csv(f, sep=';')
+            f.close()
+            dive["diveNum"] = int(fileName.split('.')[-2])
+            dive["missionNum"] = int(fileName.split('.')[1])
+            return dive
+        def extract_plaintext(filename):
+            return pd.read_csv(filename, sep=';')
+        
+        if gzipped:
+            extract_fn = extract_gzipped
+        else:
+            extract_fn = extract_plaintext
         
         _tmp = []
         for fileName in tqdm(file_list):
-            dive = pd.read_csv(gzip.open(file_dir+os.sep+fileName), sep=';')
-            dive["diveNum"] = int(fileName.split('.')[-2])
-            #dive["missionNum"] = int(fileName.split('.')[1])
-            #dive["gliderID"] = fileName.split('.')[0]
+            dive = extract_fn(fileName)
+            # print(fileName)
 
             if 'Timestamp' in dive:
                 dive['timeindex'] = pd.to_datetime(dive['Timestamp'], format="%d/%m/%Y %H:%M:%S", utc=True, origin='unix', cache='False')
@@ -81,8 +83,8 @@ class sxdf(object):
         if ('Lon' in self.data.columns) and ('Lat' in self.data.columns) and ('DeadReckoning' in self.data.columns):
             print('Parsing GPS data from NAV files and creating latitude and longitude variables.')
             print('True GPS values are marked as false in variable "DeadReckoning".')
-            self.data['longitude'] = parseGPS(self.data.Lon).interpolate('index').fillna(method='backfill')
-            self.data['latitude']  = parseGPS(self.data.Lat).interpolate('index').fillna(method='backfill')
+            self.data['longitude'] = parseGPS(self.data.Lon).interpolate('index').fillna(method='backfill') # WRONG ?
+            self.data['latitude']  = parseGPS(self.data.Lat).interpolate('index').fillna(method='backfill') # WRONG ? issue with the interpolation?
             self.data['DeadReckoning'] = self.data['DeadReckoning'].fillna(value=1).astype('bool')
         else:
             print('Could not parse GPS data from NAV files.')
@@ -202,19 +204,22 @@ def correctSalinityGarau(data,coefs=None):
         return gsw.SP_from_C(cond, temp + _internal_bias, pres) # Practical salinity
 
     def _regressSal():
-        _dives = np.unique(data.data.diveNum)[np.linspace(0, len(np.unique(data.data.diveNum))-1, 20).astype('int')] # Number of dives to regress over, 10 min, 100 probably good.
-        _dives = (np.isin(data.data.diveNum, _dives)) & (np.isfinite(data.data.temperature))
-        _temp = data.data.temperature[_dives]
-        _cond = data.data.LEGATO_CONDUCTIVITY[_dives]
-        _pres = data.data.LEGATO_PRESSURE[_dives]
-
+        _dives = data.data.diveNum.values[np.isfinite(data.data.diveNum.values)]
+        _dives = _dives[np.unique(np.linspace(1,len(_dives),20).astype('int') - 1)]
+        _dives = (np.isin(data.data.diveNum.values, _dives)) & (np.isfinite(data.data.temperature.values)) & (data.data.LEGATO_PRESSURE.values > 3)
+        
+        _temp = data.data.temperature.values[_dives]
+        _cond = data.data.LEGATO_CONDUCTIVITY.values[_dives]
+        _pres = data.data.LEGATO_PRESSURE.values[_dives]
+        _dnum = data.data.diveNum.values[_dives] ###NEW
+        
         # Use these generic values to scale parameters to same order of magnitude to help fmin.
         scaler = np.array([0.0135, 0.0264, 7.1499, 2.7858])
 
         def _PolyArea(x,y):
             _gg = np.isfinite(x+y)
             return 0.5*np.abs(np.dot(x[_gg],np.roll(y[_gg],1))-np.dot(y[_gg],np.roll(x[_gg],1)))
-
+        
         def _scoreFunction(x_vals):
             return _PolyArea( _calcSal(_temp, _cond, _pres, x_vals*scaler) , _temp)
 
@@ -244,6 +249,9 @@ def correctSalinityGarau(data,coefs=None):
 
     data.data.loc[~(abs(data.data['salinity']-data.data['LEGATO_SALINITY']) < 1),'salinity'] = np.NaN  # Can definitely play around with this threshold
     return data
+
+
+
 
 def lagCorrection(variable,referencevariable,time,lag=None):
     try:
