@@ -250,9 +250,6 @@ def correctSalinityGarau(data,coefs=None):
     data.data.loc[~(abs(data.data['salinity']-data.data['LEGATO_SALINITY']) < 1),'salinity'] = np.NaN  # Can definitely play around with this threshold
     return data
 
-
-
-
 def lagCorrection(variable,referencevariable,time,lag=None):
     try:
         time = date2float(time)
@@ -496,7 +493,7 @@ class SlocumModel(object):
 ##########################################################################################################################################################
 ##########################################################################################################################################################
 class SeagliderModel(object):
-    def __init__(self,time,sal,temp,pres,lon,lat,ballast,pitch,profile,navresource,**param):
+    def __init__(self,time,sal,temp,pres,lon,lat,ballast,pitch,profile,navresource,ADCP_vel=None,**param):
         
         self.timestamp = time
         self.time = date2float(self.timestamp)
@@ -512,6 +509,10 @@ class SeagliderModel(object):
         self.pitch = np.deg2rad(pitch) # rad
 
         self._dives = np.full(len(pres), True)
+        self.speed_through_water = ADCP_vel
+        
+        self.tau = 0
+        self.Nfeval = 1
         
         self.param_reference = dict({
             'mass': 60.772, # Vehicle mass in kg
@@ -647,19 +648,28 @@ class SeagliderModel(object):
         for _istep, _key in enumerate(self.regression_parameters):
             self.param[_key] = x_initial[_istep] * self.param_reference[_key]
         self.model_function()
-        return np.sqrt( np.nanmean( self.w_H2O[self._valid[self._dives]]**2 ) ) 
+        return self.R1()
+    
+    def R1(self):
+        return np.sqrt(np.nanmean(   (1-self.tau)*self.w_H2O[self._valid[self._dives]]**2   + 
+                                  self.tau*((self.speed_through_water[self._dives & self._valid] - self.speed[self._valid[self._dives]])**2)   ))
     
     def regress(self):
-        _dnum = np.ceil(self.profile/2)
-        _tmp = np.unique(_dnum)[np.linspace(0, len(np.unique(_dnum))-1, 20).astype('int')] # Number of dives to regress over, 10 min, 100 probably good.
-        self._dives = (np.isin(_dnum, _tmp))
+        # _dnum = np.ceil(self.profile/2)
+        # _tmp = np.unique(_dnum)[np.linspace(0, len(np.unique(_dnum))-1, 40).astype('int')] # Number of dives to regress over, 10 min, 100 probably good.
+        self._dives = np.full(np.shape(self._valid), True) #(np.isin(_dnum, _tmp))
         
         x_initial = [self.param[_key] / self.param_reference[_key] for _istep,_key in enumerate(self.regression_parameters)]
         print('Initial parameters: ', self.param)
         print('Non-optimised score: '+str(self.cost_function(x_initial)) )
         print('Regressing...')
-
-        R = fmin(self.cost_function, x_initial, disp=True, full_output=True, maxiter=1000)
+            
+        maxiter = 50
+        with tqdm(total=maxiter) as pbar:
+            def callbackF(Xi):
+                pbar.update(1)
+            R = fmin(self.cost_function, x_initial, callback=callbackF, disp=True, full_output=True, maxiter=maxiter, ftol=0.0001)
+            
         for _istep,_key in enumerate(self.regression_parameters):
             self.param[_key] = R[0][_istep] * self.param_reference[_key]
         
@@ -716,7 +726,7 @@ class SeagliderModel(object):
     
 #New Steady State model (With adcp constraint)
 class SemiDynamicModel(object):
-    def __init__(self, time, sal, temp_ext, temp_int, pres_ext, pres_int, lon, lat, ballast, pitch, profile, navresource, tau, speed_through_water,**param):
+    def __init__(self, time, sal, temp_ext, temp_int, pres_ext, pres_int, lon, lat, ballast, pitch, profile, navresource, tau, speed_through_water, **param):
         # Questions:
         # is dzdt spiky?
         # do values need to be interpolated?
@@ -755,6 +765,7 @@ class SemiDynamicModel(object):
             
             'Cd_0': 0.046, #
             'Cd_1': 2.3, #             
+            'Cd_a': 1e-3, # Pitch dependent drag to account for top/down asymmetry
             'Cl': 2.0, # Negative because wrong convention on theta
               
             'comp_p': 4.7e-06, #1.023279317627415e-06, #Pressure dependent hull compression factor
@@ -801,8 +812,8 @@ class SemiDynamicModel(object):
     ### Principal forces
     @property
     def F_B(self):
-        return self.g * self.rho * (self.ballast + self.vol0 * (1 - self.comp_p*(self.external_pressure-0.8) + self.comp_t*(self.internal_temperature+self.external_temperature)/2))
-        #return self.g * self.rho * (self.ballast + self.vol0 * (1 - self.comp_p*(self.external_pressure) + self.comp_t*(self.internal_temperature-10)))
+        # return self.g * self.rho * (self.ballast + self.vol0 * (1 - self.comp_p*(self.external_pressure-0.8) + self.comp_t*(self.internal_temperature+self.external_temperature)/2))
+        return self.g * self.rho * (self.ballast + self.vol0 * (1 - self.comp_p*(self.external_pressure) + self.comp_t*(self.internal_temperature-10)))
 
     @property
     def F_g(self):
@@ -905,7 +916,12 @@ class SemiDynamicModel(object):
         print('Non-optimised score: '+str(self.cost_function(x_initial)) )
         print('Regressing...')
 
-        R = fmin(self.cost_function, x_initial, disp=True, full_output=True, maxiter=500)
+        maxiter = 250
+        with tqdm(total=maxiter) as pbar:
+            def callbackF(Xi):
+                pbar.update(1)
+            R = fmin(self.cost_function, x_initial, callback=callbackF, disp=True, full_output=True, maxiter=maxiter, ftol=0.0001)
+            
         for _istep,_key in enumerate(self.regression_parameters):
             self.param[_key] = R[0][_istep] * self.param_reference[_key]
         
