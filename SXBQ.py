@@ -478,13 +478,12 @@ class SemiDynamicModel(object):
         self.model_function()
         return self.R1 
     
-    def regress(self):
+    def regress(self, maxiter = 300):
         x_initial = [self.param[_key] / self.param_reference[_key] for _istep,_key in enumerate(self.regression_parameters)]
         print('Initial parameters: ', self.param)
         print('Non-optimised score: '+str(self.cost_function(x_initial)) )
         print('Regressing...')
 
-        maxiter = 300
         with tqdm(total=maxiter) as pbar:
             def callbackF(Xi):
                 pbar.update(1)
