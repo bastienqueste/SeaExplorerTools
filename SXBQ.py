@@ -26,8 +26,8 @@ class sxdf(object):
     def load_files(self, file_dir, gzipped=True):
         ''' Load payload data into one dataframe and convert main timestamp to datetime format. '''
         
-        file_list = glob(file_dir)
-        # print(file_list)
+        file_list = glob(file_dir, recursive=True)
+        #print(file_list)
         
         def extract_gzipped(filename):
             f = gzip.open(fileName)
