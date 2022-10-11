@@ -5,7 +5,45 @@ from scipy import signal
 import pandas as pd
 import numpy as np
 import gsw
+from datetime import datetime as dt
 
+### GENERAL SCRIPTS
+def RunningMedian(x,N):
+    grid = np.ones((len(x)+2*N, 1 + 2*N ))*np.NaN
+    for istep in range(np.shape(grid)[1]):
+        grid[istep:len(x)+istep, istep] = x
+    return np.nanmedian(grid,axis=1)[N:-N]
+
+def RunningMax(x,N):
+    grid = np.ones((len(x)+2*N, 1 + 2*N ))*np.NaN
+    for istep in range(np.shape(grid)[1]):
+        grid[istep:len(x)+istep, istep] = x
+    return np.nanmax(grid,axis=1)[N:-N]
+
+def RunningMin(x,N):
+    grid = np.ones((len(x)+2*N, 1 + 2*N ))*np.NaN
+    for istep in range(np.shape(grid)[1]):
+        grid[istep:len(x)+istep, istep] = x
+    return np.nanmin(grid,axis=1)[N:-N]
+
+def RunningMean(x,N):
+    grid = np.ones((len(x)+2*N, 1 + 2*N ))*np.NaN
+    for istep in range(np.shape(grid)[1]):
+        grid[istep:len(x)+istep, istep] = x
+    return np.nanmean(grid,axis=1)[N:-N]
+
+def interp(x,y,xi):
+    _gg = np.isfinite(x+y)
+    return interp1d(x[_gg], y[_gg], bounds_error=False, fill_value=np.NaN)(xi)
+
+def rmsd(x):
+    return np.sqrt(np.nanmean(x**2))
+
+def plog(msg):
+    print(str(dt.now().replace(microsecond=0))+' : '+msg)
+    return None
+
+### DATA DOWNLOADss
 def download_ERA5(years=[2021], months=[1], days=[1], hours=[0], area=[0,0,0,0], variables=None, output_name=None):
     """
     Returns xarray dataset.
@@ -88,6 +126,7 @@ def download_ERA5(years=[2021], months=[1], days=[1], hours=[0], area=[0,0,0,0],
         
     return ds
 
+### OPTICAL FUNCTIONS
 def austinPetzold_1986(wavelength, k490):
     wave = np.array([350, 360, 370, 380, 390, 400,
         410, 420, 430, 440, 450, 460, 470, 480, 490, 500,

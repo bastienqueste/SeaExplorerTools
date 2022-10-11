@@ -154,10 +154,6 @@ def applyLag(x,time,N):
     _fn = interp1d(i_time, i_x, bounds_error=False, fill_value=np.NaN)
     return _fn(time)
 
-
-
-
-
 def correctSalinityGarau(data,coefs=None):
     if 'speed' in data.data:
         flowSpeed = data.data.speed.interpolate('index').values
@@ -288,8 +284,6 @@ def correctSalinityGarau(data,coefs=None):
 
     data.data.loc[~(abs(data.data['salinity']-data.data['LEGATO_SALINITY']) < 1),'salinity'] = np.NaN  # Can definitely play around with this threshold
     return data
-
-
 
 def lagCorrection(variable,referencevariable,time,lag=None):
     try:
