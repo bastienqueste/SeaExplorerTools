@@ -31,13 +31,24 @@ class sxdf(object):
         
         def extract_gzipped(filename):
             f = gzip.open(fileName)
-            dive = pd.read_csv(f, sep=';')
-            f.close()
-            dive["diveNum"] = int(fileName.split('.')[-2])
-            dive["missionNum"] = int(fileName.split('.')[1])
+            try:
+                dive = pd.read_csv(f, sep=';')
+                f.close()
+                dive["diveNum"] = int(fileName.split('.')[-2])
+                dive["missionNum"] = int(fileName.split('.')[1])
+            except:
+                print('Failed to load :  '+filename)
+                dive = pd.DataFrame()
             return dive
         def extract_plaintext(filename):
-            return pd.read_csv(filename, sep=';')
+            try:
+                dive = pd.read_csv(filename, sep=';')
+                dive["diveNum"] = int(fileName.split('.')[-1])
+                dive["missionNum"] = int(fileName.split('.')[1])
+            except:
+                print('Failed to load :  '+filename)
+                dive = pd.DataFrame()
+            return dive
         
         if gzipped:
             extract_fn = extract_gzipped
@@ -297,10 +308,42 @@ def lagCorrection(variable,referencevariable,time,lag=None):
         
     if lag is None:
         from scipy import optimize 
+        
+        
+#         def _PolyArea_triangles(sal):
+#             S,X,Y = grid2d(data.data.profileNum.values[_dives],data.data.LEGATO_PRESSURE.values[_dives],sal,xi=1,yi=0.3,fn='mean')
+#             def merge_profiles(idx):
+#                 x1 = S[:,idx]
+#                 x2 = S[:,idx+1]
+#                 y1 = T[:,idx]
+#                 y2 = T[:,idx+1]
+#                 _gd = np.isfinite(x1+x2+y1+y2)
+#                 x1 = x1[_gd]
+#                 x2 = x2[_gd]
+#                 y1 = y1[_gd]
+#                 y2 = y2[_gd]
+#                 return x1,x2,y1,y2
+#             def triangleArea(x1,y1,x2,y2,x3,y3):
+#                 return abs((0.5)*(x1*(y2-y3)+x2*(y3-y1)+x3*(y1-y2)))
+#             area = 0 
+#             for idd in range(np.shape(T)[1]-1):
+#                 x1,x2,y1,y2 = merge_profiles(idd)
+#                 area = area + np.nansum(triangleArea(
+#                     np.append(x1,np.NaN),np.append(y1,np.NaN),
+#                     np.append(x2,np.NaN),np.append(y2,np.NaN),
+#                     np.append(np.NaN,x1),np.append(np.NaN,y1)  )) 
+#                 area = area + np.nansum(triangleArea(
+#                     np.append(np.NaN,x1),np.append(np.NaN,y1),
+#                     np.append(x2,np.NaN),np.append(y2,np.NaN),
+#                     np.append(np.NaN,x2),np.append(np.NaN,y2)  ))
+#             return area
+        
         def _PolyArea(x,y):
             _gg = np.isfinite(x+y) 
             return 0.5*np.abs(np.dot(x[_gg],np.roll(y[_gg],1))-np.dot(y[_gg],np.roll(x[_gg],1)))
             # Doesn't work well with intersecting polygon.... Problem??
+            
+            
         def _f(x):
             return _PolyArea(_Correction(x),referencevariable)
         print('Regressing lag coefficient:')
