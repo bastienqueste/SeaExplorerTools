@@ -44,27 +44,6 @@ sns.set(font='Franklin Gothic Book',
         font_scale=1)
 
 
-def RunningMedian(x, N):
-    grid = np.ones((len(x) + 2 * N, 1 + 2 * N)) * np.NaN
-    for istep in range(np.shape(grid)[1]):
-        grid[istep:len(x) + istep, istep] = x
-    return np.nanmedian(grid, axis=1)[N:-N]
-
-
-def RunningMax(x, N):
-    grid = np.ones((len(x) + 2 * N, 1 + 2 * N)) * np.NaN
-    for istep in range(np.shape(grid)[1]):
-        grid[istep:len(x) + istep, istep] = x
-    return np.nanmax(grid, axis=1)[N:-N]
-
-
-def RunningMin(x, N):
-    grid = np.ones((len(x) + 2 * N, 1 + 2 * N)) * np.NaN
-    for istep in range(np.shape(grid)[1]):
-        grid[istep:len(x) + istep, istep] = x
-    return np.nanmin(grid, axis=1)[N:-N]
-
-
 def RunningMean(x, N):
     grid = np.ones((len(x) + 2 * N, 1 + 2 * N)) * np.NaN
     for istep in range(np.shape(grid)[1]):
@@ -91,9 +70,6 @@ def load_adcp_glider_data(adcp_path, glider_pqt_path):
 
     ADCP = xr.open_mfdataset(adcp_path, group='Data/Average')
     ADCP_settings = xr.open_mfdataset(glob(adcp_path)[0], group='Config')
-
-    bin_size = ADCP_settings.attrs['avg_cellSize']
-    blanking_distance = ADCP_settings.attrs['avg_blankingDistance']
 
     plog('Finished loading ADCP data')
     # Coordinates
@@ -327,9 +303,6 @@ def _heading_correction(ADCP, data, options):
 
     plt.subplot(436)
     _ = plt.hist(cal_heading - ADCP.Heading, np.linspace(-20, 20, 100))
-
-    def setSquare(gca):
-        gca.set_box_aspect(1)
 
     plt.subplot(437)
     plt.axvline(0, color='k')
@@ -725,20 +698,6 @@ def correct_backscatter(ADCP, data):
         alpha = A1 * P1 * f1 * fxf / (f1 ** 2 + fxf) + A2 * P2 * f2 * fxf / (f2 ** 2 + fxf) + A3 * P3 * fxf
         return alpha / 1000
 
-    def fresnel_distance_alseamar(C, f=1000, d=0.03):
-        # f (KHz)	: mean acoustic frequency
-        # C (m/s)	: Medium celerity
-        # d (m)		: Transducer diameter
-        # Rf (m)	: Fresnel distance
-
-        # Acoustic wavelength
-        f_Hz = 1000 * f  # f in Hertz
-        lambda_ = C / f_Hz
-
-        # Fresnel distance
-        Rf = (d ** 2) / (2 * lambda_)
-
-        return Rf
 
     a = np.cos(np.deg2rad(47.4))  # Beam 1 and 3 angle from Z 47.5
     b = np.cos(np.deg2rad(25))  # Beam 2 and 4 angle from Z 25
@@ -843,11 +802,6 @@ def regridADCPdata(ADCP, ADCP_settings, options, depth_offsets=None):
                                              - np.tile(depth_offsets, (len(ADCP.time), 1))
                                              )})
 
-    ## Discard everything that wasn't gridded
-    # ADCP = ADCP.drop(labels=['D1','D2','D3','D4',
-    #                          'CorrelationBeam1','CorrelationBeam2','CorrelationBeam3','CorrelationBeam4',
-    #                          'VelocityBeam1','VelocityBeam2','VelocityBeam3','VelocityBeam4',
-    #                          'AmplitudeBeam1','AmplitudeBeam2','AmplitudeBeam3','AmplitudeBeam4'])
     if options['debug']:
         plt.figure(figsize=(20, 5))
         ADCP['V1'].differentiate(coord='depth_offset').mean(dim='time').plot()
@@ -1454,6 +1408,7 @@ def bottom_track(ADCP, adcp_path, options):
 
     return ADCP
 
+
 def verify_bottom_track(ADCP, data, dE,dN,dT ):
     x = np.arange(0,np.shape(ADCP.Sh_E.values)[0],1)
 
@@ -1656,6 +1611,7 @@ def _grid_glider_data(data, out, xaxis, yaxis):
             print('Variable "'+varname+'" failed to grid.')
 
     return out
+
 
 def grid_data(ADCP, data, out, xaxis, yaxis):
     ADCP_pnum = np.tile(ADCP.profileNum, (len(ADCP.gridded_bin), 1)).T
