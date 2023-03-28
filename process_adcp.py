@@ -18,6 +18,8 @@ import cmocean.cm as cmo
 
 warnings.filterwarnings(action='ignore', message='Mean of empty slice')
 warnings.filterwarnings(action='ignore', message='invalid value encountered in divide')
+warnings.filterwarnings(action='ignore', message='invalid value encountered in true_divide')
+warnings.filterwarnings(action='ignore', message='Degrees of freedom <= 0 for slice.')
 
 sns.set(font='Franklin Gothic Book',
         rc={
@@ -247,7 +249,7 @@ def _heading_correction(ADCP, data, options):
     rmsd = lambda x, y, z: np.sqrt(np.mean((norm(x, y, z) - target) ** 2))
 
     def circ(x):
-        idx = np.abs(x) > 180
+        idx = (np.abs(x) > 180).values
         x[idx] = x[idx] + (360 * -np.sign(x[idx]))
         return x
 
@@ -542,7 +544,7 @@ def plotit(ADCP):
     plt.ylim(np.array([-1, 1]) * 1.5e-3)
 
 
-def shear_correction(ADCP, var, correct=True):
+def _shear_correction(ADCP, var, correct=True):
     def get_correction_array(row):
         ### SEPARATION CRITERIA
         spd_thr_water = np.sqrt(ADCP['X4'] ** 2 + ADCP['Y4'] ** 2 + ((ADCP['Z4'] + ADCP['ZZ4']) / 2) ** 2)
@@ -635,10 +637,10 @@ def correct_shear(ADCP, options):
     ADCP = do_beam2xyzz(ADCP)
     plotit(ADCP)
 
-    if options['correctZZshear']: ADCP = do_beam2xyzz(ADCP); shear_correction(ADCP, 'ZZ4'); ADCP = do_xyzz2beam(ADCP);
-    if options['correctZshear']: ADCP = do_beam2xyzz(ADCP); shear_correction(ADCP, 'Z4'); ADCP = do_xyzz2beam(ADCP);
-    if options['correctYshear']: ADCP = do_beam2xyzz(ADCP); shear_correction(ADCP, 'Y4'); ADCP = do_xyzz2beam(ADCP);
-    if options['correctXshear']: ADCP = do_beam2xyzz(ADCP); shear_correction(ADCP, 'X4'); ADCP = do_xyzz2beam(ADCP);
+    if options['correctZZshear']: ADCP = do_beam2xyzz(ADCP); _shear_correction(ADCP, 'ZZ4'); ADCP = do_xyzz2beam(ADCP);
+    if options['correctZshear']: ADCP = do_beam2xyzz(ADCP); _shear_correction(ADCP, 'Z4'); ADCP = do_xyzz2beam(ADCP);
+    if options['correctYshear']: ADCP = do_beam2xyzz(ADCP); _shear_correction(ADCP, 'Y4'); ADCP = do_xyzz2beam(ADCP);
+    if options['correctXshear']: ADCP = do_beam2xyzz(ADCP); _shear_correction(ADCP, 'X4'); ADCP = do_xyzz2beam(ADCP);
 
     if options['correctZZshear'] or options['correctZshear'] or options['correctYshear'] or options[
         'correctXshear']: plotit(ADCP);
