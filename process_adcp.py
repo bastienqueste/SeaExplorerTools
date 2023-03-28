@@ -1,20 +1,14 @@
-import os, gc, sys, warnings
+import warnings
 from glob import glob
-import importlib
-
 import SXBQ as sx
-import BYQtools as byq
-
 from tqdm import tqdm
-from multiprocessing import Pool
 from datetime import datetime as dt
 
 import numpy as np
 import pandas as pd
 import xarray as xr
-from scipy.interpolate import interp1d, interp2d
-from scipy.optimize import fsolve, fmin
-from scipy.signal import convolve as conv
+from scipy.interpolate import interp1d
+from scipy.optimize import fmin
 
 import gsw
 
@@ -166,31 +160,31 @@ def remapADCPdepth(ADCP, options):
 
     ADCP['D1'] = (
         ['time', 'bin'],
-        np.tile(ADCP['Depth'], (len(ADCP.bin), 1)).T \
-        - direction \
-        * np.tile(z_bin_distance, (len(ADCP.time), 1)) \
-        * np.tile(np.cos(theta_rad_1), (len(ADCP.bin), 1)).T \
+        np.tile(ADCP['Depth'], (len(ADCP.bin), 1)).T
+        - direction
+        * np.tile(z_bin_distance, (len(ADCP.time), 1))
+        * np.tile(np.cos(theta_rad_1), (len(ADCP.bin), 1)).T
         )
     ADCP['D2'] = (
         ['time', 'bin'],
-        np.tile(ADCP['Depth'], (len(ADCP.bin), 1)).T \
+        np.tile(ADCP['Depth'], (len(ADCP.bin), 1)).T
         - direction \
-        * np.tile(z_bin_distance, (len(ADCP.time), 1)) \
-        * np.tile(np.cos(theta_rad_2), (len(ADCP.bin), 1)).T \
+        * np.tile(z_bin_distance, (len(ADCP.time), 1))
+        * np.tile(np.cos(theta_rad_2), (len(ADCP.bin), 1)).T
         )
     ADCP['D3'] = (
         ['time', 'bin'],
-        np.tile(ADCP['Depth'], (len(ADCP.bin), 1)).T \
+        np.tile(ADCP['Depth'], (len(ADCP.bin), 1)).T
         - direction \
-        * np.tile(z_bin_distance, (len(ADCP.time), 1)) \
-        * np.tile(np.cos(theta_rad_3), (len(ADCP.bin), 1)).T \
+        * np.tile(z_bin_distance, (len(ADCP.time), 1))
+        * np.tile(np.cos(theta_rad_3), (len(ADCP.bin), 1)).T
         )
     ADCP['D4'] = (
         ['time', 'bin'],
-        np.tile(ADCP['Depth'], (len(ADCP.bin), 1)).T \
+        np.tile(ADCP['Depth'], (len(ADCP.bin), 1)).T
         - direction \
-        * np.tile(z_bin_distance, (len(ADCP.time), 1)) \
-        * np.tile(np.cos(theta_rad_4), (len(ADCP.bin), 1)).T \
+        * np.tile(z_bin_distance, (len(ADCP.time), 1))
+        * np.tile(np.cos(theta_rad_4), (len(ADCP.bin), 1)).T
         )
 
     if options['debug']:
@@ -224,8 +218,6 @@ def remapADCPdepth(ADCP, options):
         plt.gca().invert_yaxis()
     plog('Depth calculation of cells correct. Beam 1 2 4 match on down; 3 2 4 match on up. (Tested on downward facing)')
     return ADCP
-
-
 
 
 def _heading_correction(ADCP, data, options):
@@ -361,14 +353,6 @@ def _heading_correction(ADCP, data, options):
     plt.ylabel('MagY')
     plt.axis('square')
 
-    # plt.subplot(439)
-    # plt.axvline(0,color='k')
-    # plt.axhline(0,color='k')
-    # plt.scatter(MagZ.values, MagX.values, 1, 'r')
-    # plt.scatter(magz,magx, 1, 'b')
-
-    mag_bias = norm(magx, magy, magz) - target
-
     return cal_heading
 
 
@@ -501,25 +485,21 @@ def plot_data_density(ADCP, ADCP_settings):
 
 ### Defining coordinate transform functions for the 4 beam ADCP configuration
 def quad_beam2xyzz_mat():
-    # M11=0.6782; M12=0.0000; M13=-0.6782; M14=0.0000
-    # M21=0.0000; M22=-1.1831; M23=0.0000; M24=1.1831
-    # M31=0.7400; M32=0.0000; M33=0.7400; M34=0.0000
-    # M41=0.0000; M42=0.5518; M43=0.0000; M44=0.5518
-    M11 = 0.6782;
-    M12 = 0.0000;
-    M13 = -0.6782;
+    M11 = 0.6782
+    M12 = 0.0000
+    M13 = -0.6782
     M14 = 0.0000
-    M21 = 0.0000;
-    M22 = -1.1831;
-    M23 = 0.0000;
+    M21 = 0.0000
+    M22 = -1.1831
+    M23 = 0.0000
     M24 = 1.1831
-    M31 = 0.7400;
-    M32 = 0.0000;
-    M33 = 0.7400;
+    M31 = 0.7400
+    M32 = 0.0000
+    M33 = 0.7400
     M34 = 0.0000
-    M41 = 0.0000;
-    M42 = 0.5518;
-    M43 = 0.0000;
+    M41 = 0.0000
+    M42 = 0.5518
+    M43 = 0.0000
     M44 = 0.5518
     T = np.array([[M11, M12, M13, M14], [M21, M22, M23, M24], [M31, M32, M33, M34], [M41, M42, M43, M44]])
     # if not top_mounted:
@@ -532,7 +512,7 @@ def quad_beam2xyzz(B1, B2, B3, B4):
     try:
         r, c = np.shape(B1.values)
     except:
-        c = 1;
+        c = 1
         r = len(B1.values)
     V = np.array([B1.values.flatten(),
                   B2.values.flatten(),
@@ -615,9 +595,9 @@ def shear_correction(ADCP, var, correct=True):
         sz = sz / np.max(sz) * 50
 
         plt.subplot(2, 3, 2 + row)
-        x = [];
-        y = [];
-        c = [];
+        x = []
+        y = []
+        c = []
         s = []
         for idx, range_level in enumerate(full_range):
             color = colormap(cmaps[idx])
@@ -637,9 +617,9 @@ def shear_correction(ADCP, var, correct=True):
         plt.grid('on')
 
         plt.subplot(2, 3, 3 + row)
-        x = [];
-        y = [];
-        c = [];
+        x = []
+        y = []
+        c = []
         s = []
         for idx, range_level in enumerate(full_range):
             color = colormap(cmaps[idx])
@@ -833,7 +813,6 @@ def regridADCPdata(ADCP, ADCP_settings, options, depth_offsets=None):
     print('Running gridding on all 4 beams:')
 
     ## Extract to np array for speed
-    adcp_depth = ADCP['Depth'].values
 
     for beam in ['1', '2', '3', '4']:
         plog('Calculating beam ' + beam)
@@ -946,9 +925,6 @@ def calcXYZfrom3beam(ADCP, options):
     Y = -c * a(ts) * V2 + c * a(ts) * V4  # TODO: sign uncertainty here
     Z = 2 * b(ts) * V2 + 2 * b(ts) * V4
 
-    # X = c*0.6782*V1 - c*0.6782*V3
-    # Y = -c*1.1831*V2 + c*1.1831*V4 # TODO: sign uncertainty here
-    # Z = 0.5518*V2 + 0.5518*V4
 
     ADCP['X'] = (['time', 'gridded_bin'], X)
     ADCP['Y'] = (['time', 'gridded_bin'], Y)
@@ -1038,29 +1014,6 @@ def calcENUfromXYZ(ADCP, data, options):
         pp = np.pi * pitch / 180
         rr = np.pi * roll / 180
 
-        #         _H = np.array([
-        #             [np.cos(hh),np.sin(hh),0],
-        #             [-np.sin(hh),np.cos(hh),0],
-        #             [0,0,1]
-        #         ])
-        #         _P = np.array([
-        #             [np.cos(pp), 0, -np.sin(pp)] ,
-        #             [0,          1,           0] ,
-        #             [np.sin(pp), 0,   np.cos(pp)]
-        #         ])
-        #         _R = np.array([
-        #             [1, 0, 0] ,
-        #             [0, np.cos(rr), -np.sin(rr)] ,
-        #             [0, np.sin(rr), np.cos(rr)]
-        #         ])
-
-        #         _M = _H@_P@_R
-
-        # GPT = [
-        #       [np.cos(hh) * np.cos(pp), np.cos(hh) * np.sin(pp) * np.sin(rr) - np.sin(hh) * np.cos(rr), np.cos(hh) * np.sin(pp) * np.cos(rr) + np.sin(hh) * np.sin(rr)],
-        #       [np.sin(hh) * np.cos(pp), np.sin(hh) * np.sin(pp) * np.sin(rr) + np.cos(hh) * np.cos(rr), np.sin(hh) * np.sin(pp) * np.cos(rr) - np.cos(hh) * np.sin(rr)],
-        #       [-np.sin(pp), np.cos(pp) * np.sin(rr), np.cos(pp) * np.cos(rr)]
-        #     ]
         GPT = [
             [np.cos(hh) * np.cos(pp), -np.cos(hh) * np.sin(pp) * np.sin(rr) + np.sin(hh) * np.cos(rr),
              -np.cos(hh) * np.sin(pp) * np.cos(rr) - np.sin(hh) * np.sin(rr)],
@@ -1068,8 +1021,6 @@ def calcENUfromXYZ(ADCP, data, options):
              np.sin(hh) * np.sin(pp) * np.cos(rr) - np.cos(hh) * np.sin(rr)],
             [np.sin(pp), np.cos(pp) * np.sin(rr), np.cos(pp) * np.cos(rr)]
         ]
-        # print(_M)
-        # print(GPT)
         return GPT
 
     if options['top_mounted']:
@@ -1130,12 +1081,12 @@ def calcENUfromXYZ(ADCP, data, options):
     vg_n = (ADCP['fm_horz'] * np.cos(ADCP['Heading'].values * np.pi / 180) * deltat).isel(time=_gd)
 
     ## Lat and Lon from data.data - affected by DAC which fucks things up
-    Lon = ADCP['Longitude'].isel(time=_gd).values;
+    Lon = ADCP['Longitude'].isel(time=_gd).values
     Lon = Lon * (40075000 * np.cos(np.deg2rad(np.nanmedian(ADCP['Latitude'].values))) / 360)
-    Lat = ADCP['Latitude'].isel(time=_gd).values;
+    Lat = ADCP['Latitude'].isel(time=_gd).values
     Lat = Lat * 111319.444
-    Lon = np.gradient(Lon);  # Lon[np.abs(Lon) > 5] = 0;
-    Lat = np.gradient(Lat);  # Lat[np.abs(Lat) > 5] = 0;
+    Lon = np.gradient(Lon)  # Lon[np.abs(Lon) > 5] = 0;
+    Lat = np.gradient(Lat)  # Lat[np.abs(Lat) > 5] = 0;
     Lon = np.nancumsum(Lon)
     Lat = np.nancumsum(Lat)
 
@@ -1825,82 +1776,12 @@ def verify_depth_bias(out, yaxis, E='ADCP_E', N='ADCP_N'):
 
         plt.plot([Nm - 2 * Nse, Nm + 2 * Nse], np.array([1, 1]) * -float(d), '-k', linewidth=3, alpha=1)
         plt.plot([Sm - 2 * Sse, Sm + 2 * Sse], np.array([1, 1]) * -float(d), '-k', linewidth=3, alpha=1)
-        # plt.plot([Nm,Sm],np.array([1,1])*-float(d),'k',marker='.',linestyle='none')
 
     plt.ylabel('Depth (m) / ' + str(SF) + '*PDF')
     plt.xlabel('Velocity')
     plt.legend(('Zero', 'Northward travel', 'Southward travel'))
     plt.title('MAG')
 
-    # plt.savefig(filename[:filename.rfind('/')+1]+'ADCP_dsitribution.png', bbox_inches='tight')
-
-    return None
-# # Robert Todd method
-
-# def get_bias(C):
-#     bias = yaxis*C/np.max(yaxis) 
-#     bias = bias-np.mean(bias)
-#     return np.tile(bias,[len(taxis),1]).T
-
-# def M_xyz2enu(heading,pitch,roll):
-#     hh = np.pi*(heading-90)/180
-#     pp = np.pi*pitch/180
-#     rr = np.pi*roll/180
-
-#     _H = np.array([
-#         [np.cos(hh),np.sin(hh),0], 
-#         [-np.sin(hh),np.cos(hh),0], 
-#         [0,0,1]
-#     ])
-#     _P = np.array([
-#         [np.cos(pp), 0, -np.sin(pp)] ,
-#         [0, 1, 0] , 
-#         [ np.sin(pp), 0, np.cos(pp)]
-#     ])
-#     _R = np.array([
-#         [1, 0, 0] ,
-#         [0, np.cos(rr), -np.sin(rr)] , 
-#         [0, np.sin(rr), np.cos(rr)]
-#     ])
-
-#     _M = _H@_P@_R
-#     return _M
-
-# X_bias = get_bias(0.1)
-# Y_bias = get_bias(0.5)
-
-# if top_mounted:
-#     direction = 1
-# else:
-#     direction = -1
-
-# # E = ADCP['X'].values.copy()
-# # N = ADCP['Y'].values.copy()*direction
-# # U = ADCP['Z'].values.copy()*direction
-
-# r,c = np.shape(X_bias)
-
-# X = X_bias.flatten()
-# Y = Y_bias.flatten()
-# H = out['Heading'].flatten()
-# P = out['Pitch'].flatten()
-# R = out['Roll'].flatten()
-
-# E_bias = np.full(len(X),np.NaN)
-# N_bias = np.full(len(X),np.NaN)
-# U_bias = np.full(len(X),np.NaN)
-
-# for i in tqdm(range(len(X))):
-#     E_bias[i], N_bias[i], _ = M_xyz2enu(H[i],P[i],R[i]) @ [X[i], Y[i], 0]
-
-# E_bias = np.reshape(E_bias, (r,c))
-# N_bias = np.reshape(N_bias, (r,c))
-
-# out['ADCP_E_corr'] = out['ADCP_E'] + E_bias
-# out['ADCP_N_corr'] = out['ADCP_N'] + N_bias
-
-
-# verify_depth_bias(E = 'ADCP_E_corr', N = 'ADCP_N_corr')
 
 def plot_bias(out, yaxis, taxis, days):
     def get_bias(glider_speed, coeff):
