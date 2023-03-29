@@ -11,7 +11,7 @@ def test_processing():
     adcp_path = 'ADCP_refactoring_test_files/sea045_M44.ad2cp.00000*.nc'
     glider_pqt_path = 'ADCP_refactoring_test_files/Skag_test.pqt'
     options = {
-        'debug': True,
+        'debug': False,
         'correctADCPHeading': True,
         'ADCP_discardFirstBins': 0,
         'ADCP_correlationThreshold': 70,
@@ -28,19 +28,17 @@ def test_processing():
     ADCP = process_adcp.correct_heading(ADCP, data, options)
     ADCP = process_adcp.soundspeed_correction(ADCP)
     ADCP = process_adcp.remove_outliers(ADCP, options)
-    process_adcp.plot_data_density(ADCP, ADCP_settings)
     ADCP = process_adcp.correct_shear(ADCP, options)
     ADCP = process_adcp.correct_backscatter(ADCP, data)
     ADCP = process_adcp.regridADCPdata(ADCP, ADCP_settings, options)
     ADCP = process_adcp.calcXYZfrom3beam(ADCP, options)
     ADCP = process_adcp.calcENUfromXYZ(ADCP, data, options)
-    process_adcp.verify_calcENUfromXYZ(ADCP)
     data = process_adcp.get_DAC(ADCP, data)
     dE, dN, dT = process_adcp.getSurfaceDrift(data)
     ADCP = process_adcp.bottom_track(ADCP, adcp_path, options)
     out, xaxis, yaxis, taxis, days = process_adcp.verify_bottom_track(ADCP, data, dE, dN, dT)
     out = process_adcp.grid_data(ADCP, data, out, xaxis, yaxis)
-    process_adcp.plot_bias(out, yaxis, taxis, days)
+    out = process_adcp.calc_bias(out, yaxis, taxis, days)
 
     profiles = np.arange(out["Pressure"].shape[1])
     depth_bins = np.arange(out["Pressure"].shape[0])
@@ -57,6 +55,3 @@ def test_processing():
     for var in list(ds_min):
         assert np.allclose(ds_min[var], ds_min_test[var], equal_nan=True, atol=1e-7, rtol=1e-3)
 
-
-if __name__ == '__main__':
-    test_processing()

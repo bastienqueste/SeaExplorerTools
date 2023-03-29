@@ -1741,7 +1741,7 @@ def verify_depth_bias(out, yaxis, E='ADCP_E', N='ADCP_N'):
     plt.title('MAG')
 
 
-def plot_bias(out, yaxis, taxis, days):
+def calc_bias(out, yaxis, taxis, days):
     def get_bias(glider_speed, coeff):
         r, c = np.shape(glider_speed)
         bias = np.nancumsum(glider_speed, axis=0)
@@ -1809,3 +1809,4 @@ def plot_bias(out, yaxis, taxis, days):
     plt.xlabel('Yo number')
     plt.xlabel('Depth')
     plt.title('Northward velocity (m.s-1)')
+    return out
