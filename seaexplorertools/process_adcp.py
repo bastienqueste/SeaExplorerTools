@@ -67,7 +67,7 @@ def plog(msg):
     return None
 
 
-def load_adcp_glider_data(adcp_path, glider_pqt_path):
+def load_adcp_glider_data(adcp_path, glider_pqt_path, options):
     data = sx.load(glider_pqt_path)
 
     ADCP = xr.open_mfdataset(adcp_path, group='Data/Average')
@@ -114,7 +114,14 @@ def load_adcp_glider_data(adcp_path, glider_pqt_path):
     ADCP = ADCP.swap_dims({'Amplitude Range': 'bin'})
 
     plog('Added glider variables')
-    return ADCP, data, ADCP_settings
+
+    # Detect if ADCP is top mounted using the magnetometer
+    if ADCP.MagnetometerZ.values.mean() < 0:
+        options['top_mounted'] = True
+    else:
+        options['top_mounted'] = False
+    plog(f'top mounted: {options["top_mounted"]}')
+    return ADCP, data, ADCP_settings, options
 
 
 def remapADCPdepth(ADCP, options):
@@ -743,7 +750,7 @@ def regridADCPdata(ADCP, ADCP_settings, options, depth_offsets=None):
             direction = 1
         else:
             direction = -1
-        threshold = 20
+        threshold = options['ADCP_regrid_correlation_threshold']
         means = [np.nanmean(ADCP['CorrelationBeam' + str(x)], axis=0) for x in [1, 2, 3, 4]]
         stds = [np.nanstd(ADCP['CorrelationBeam' + str(x)], axis=0) for x in [1, 2, 3, 4]]
 

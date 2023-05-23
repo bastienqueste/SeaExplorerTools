@@ -21,9 +21,9 @@ def test_processing():
         'correctYshear': False,
         'correctZshear': False,
         'correctZZshear': False,
-        'top_mounted': True
+        'ADCP_regrid_correlation_threshold': 20,
     }
-    ADCP, data, ADCP_settings = process_adcp.load_adcp_glider_data(adcp_path, glider_pqt_path)
+    ADCP, data, ADCP_settings, options = process_adcp.load_adcp_glider_data(adcp_path, glider_pqt_path, options)
     ADCP = process_adcp.remapADCPdepth(ADCP, options)
     ADCP = process_adcp.correct_heading(ADCP, data, options)
     ADCP = process_adcp.soundspeed_correction(ADCP)
