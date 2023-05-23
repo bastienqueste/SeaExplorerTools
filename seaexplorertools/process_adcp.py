@@ -1,6 +1,6 @@
 import warnings
 from glob import glob
-import seaexplorertools.SXBQ as sx
+import seaexplorertools.seaexplorer_utilities as sx
 from tqdm import tqdm
 from datetime import datetime as dt
 
