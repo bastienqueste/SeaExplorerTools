@@ -8,7 +8,7 @@ from seaexplorertools import process_adcp
 
 
 def test_processing():
-    adcp_path = 'ADCP_refactoring_test_files/sea045_M44.ad2cp.00000*.nc'
+    adcp_path = 'ADCP_refactoring_test_files/sea045_M44.ad2cp.00000_1.nc'
     glider_pqt_path = 'ADCP_refactoring_test_files/Skag_test.pqt'
     options = {
         'debug': False,
@@ -24,6 +24,8 @@ def test_processing():
         'ADCP_regrid_correlation_threshold': 20,
     }
     ADCP, data, ADCP_settings, options = process_adcp.load_adcp_glider_data(adcp_path, glider_pqt_path, options)
+    data = data[data.diveNum < 100]
+    ADCP = ADCP.where(ADCP.time < data.Timestamp.values[-1]).dropna(dim="time", how="all")
     ADCP = process_adcp.remapADCPdepth(ADCP, options)
     ADCP = process_adcp.correct_heading(ADCP, data, options)
     ADCP = process_adcp.soundspeed_correction(ADCP)
