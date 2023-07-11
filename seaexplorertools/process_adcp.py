@@ -40,6 +40,7 @@ sns.set(font='Franklin Gothic Book',
             'ytick.left': False,
             'ytick.right': False},
         font_scale=1)
+y_res = 1
 
 
 def load(parquet_file):
@@ -1440,7 +1441,7 @@ def bottom_track(ADCP, adcp_path, options):
     return ADCP
 
 
-def verify_bottom_track(ADCP, glider, dE,dN,dT ):
+def grid_shear_data(ADCP, glider):
     x = np.arange(0,np.shape(ADCP.Sh_E.values)[0],1)
 
     SHEm,XI,YI = grid2d(
@@ -1485,12 +1486,15 @@ def verify_bottom_track(ADCP, glider, dE,dN,dT ):
     plt.subplot(222)
     _ = plt.hist(SHEs.flatten(), np.linspace(0,0.05,100))
 
-    out = {}
-    y_res = 1
     yaxis = np.arange(0, np.nanmax(np.ceil(glider.LEGATO_PRESSURE.values)), y_res)
     xaxis = glider.date_float.groupby(glider.profileNum).agg('mean').index
     taxis = pd.to_datetime(glider.date_float.groupby(glider.profileNum).agg('mean').values)
     days = np.unique(glider.Timestamp.round('D'))
+    return xaxis, yaxis, taxis, days
+
+
+def verify_bottom_track(ADCP, glider, dE, dN, dT, xaxis, yaxis, taxis):
+    out = {}
 
     var = ['E', 'N']
 
@@ -1620,7 +1624,7 @@ def verify_bottom_track(ADCP, glider, dE,dN,dT ):
 
         plt.legend(('DAC error ' + letter, 'Drift error ' + letter, 'BT error ' + letter))
         plt.ylim([-0.2, 0.2])
-    return out, xaxis, yaxis, taxis, days
+    return out
 
 
 def _grid_glider_data(glider, out, xaxis, yaxis):
