@@ -25,8 +25,8 @@ def test_processing():
         'ADCP_regrid_correlation_threshold': 20,
     }
     ADCP, data, options = process_adcp.load_adcp_glider_data(adcp_path, glider_pqt_path, options)
-    data = data[data.profileNum < 199]
-    ADCP = ADCP.where(ADCP.time < data.Timestamp.values[-1]).dropna(dim="time", how="all")
+    data = data[data.profile_number < 199]
+    ADCP = ADCP.where(ADCP.time < data.time.values[-1]).dropna(dim="time", how="all")
     ADCP = process_adcp.remapADCPdepth(ADCP, options)
     ADCP = process_adcp.correct_heading(ADCP, data, options)
     ADCP = process_adcp.soundspeed_correction(ADCP)
