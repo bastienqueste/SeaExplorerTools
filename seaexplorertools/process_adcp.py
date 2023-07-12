@@ -53,13 +53,7 @@ def load(parquet_file):
     "longitude",
     "profileNum",
     "Declination",
-    "DeadReckoning",
-    "NAV_RESOURCE",
-    "diveNum",
     "LEGATO_PRESSURE",
-    # Only for integrated currents
-    "speed_vert",
-    "speed_horz",
     ]
     data = data[sel_cols]
     data["date_float"] = data['Timestamp'].values.astype('float')

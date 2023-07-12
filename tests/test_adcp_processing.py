@@ -1,5 +1,6 @@
 import xarray as xr
 import numpy as np
+import pandas as pd
 from pathlib import Path
 import sys
 module_dir = Path(__file__).parent.parent.absolute()
@@ -24,7 +25,7 @@ def test_processing():
         'ADCP_regrid_correlation_threshold': 20,
     }
     ADCP, data, options = process_adcp.load_adcp_glider_data(adcp_path, glider_pqt_path, options)
-    data = data[data.diveNum < 100]
+    data = data[data.profileNum < 199]
     ADCP = ADCP.where(ADCP.time < data.Timestamp.values[-1]).dropna(dim="time", how="all")
     ADCP = process_adcp.remapADCPdepth(ADCP, options)
     ADCP = process_adcp.correct_heading(ADCP, data, options)
@@ -56,6 +57,13 @@ def test_processing():
         assert np.allclose(ds_min[var], ds_min_test[var], equal_nan=True, atol=1e-7, rtol=1e-3)
 
     # integrate the gridded shear from here
+    
+    extra_data = pd.read_parquet(glider_pqt_path)
+    data["speed_vert"] = extra_data["speed_vert"]
+    data["speed_horz"] = extra_data["speed_horz"]
+    data["DeadReckoning"] = extra_data["DeadReckoning"]
+    data["NAV_RESOURCE"] = extra_data["NAV_RESOURCE"]
+    data["diveNum"] = extra_data["diveNum"]
 
     process_adcp.plot_subsurface_movement(ADCP, data)
     data = process_adcp.get_DAC(ADCP, data)
