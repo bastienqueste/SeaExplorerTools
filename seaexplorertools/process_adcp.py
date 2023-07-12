@@ -11,6 +11,8 @@ import gsw
 import matplotlib.pyplot as plt
 import seaborn as sns
 import cmocean.cm as cmo
+import json
+from  urllib import request
 
 warnings.filterwarnings(action='ignore', message='Mean of empty slice')
 warnings.filterwarnings(action='ignore', message='invalid value encountered in divide')
@@ -41,6 +43,27 @@ sns.set(font='Franklin Gothic Book',
             'ytick.right': False},
         font_scale=1)
 y_res = 1
+
+
+def get_declination(data, key):
+    """ Function retrieves declination data from NOAA for the average lon, lat and datetime of glider data.
+    Requires an API key. Register at https://www.ngdc.noaa.gov/geomag/CalcSurvey.shtml
+    """
+    if "declination" in list(data):
+        print("declination data already present")
+        return data
+    time = data.time.mean()
+    year = time.year
+    month = time.month
+    day = time.day
+    lat = data.latitude.mean()
+    lon = data.longitude.mean()
+    url = f"https://www.ngdc.noaa.gov/geomag-web/calculators/calculateDeclination?startYear={year}&startMonth={month}" \
+          f"&startDay={day}&lat1={lat}&lon1={lon}&key={key}&resultFormat=json"
+    result = json.load(request.urlopen(url))
+    declination = result['result'][0]['declination']
+    print(f"declination of {declination} added to data")
+    data["declination"] = declination
 
 
 def load(parquet_file):
