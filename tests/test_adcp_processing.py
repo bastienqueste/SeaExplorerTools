@@ -8,11 +8,12 @@ sys.path.append(str(module_dir))
 from seaexplorertools import process_adcp
 
 
+
 def test_processing():
     adcp_path = 'ADCP_refactoring_test_files/sea045_M44.ad2cp.00000_1.nc'
     glider_pqt_path = 'ADCP_refactoring_test_files/Skag_test.pqt'
     options = {
-        'debug': False,
+        'debug_plots': False,
         'correctADCPHeading': True,
         'ADCP_discardFirstBins': 0,
         'ADCP_correlationThreshold': 70,
@@ -32,13 +33,13 @@ def test_processing():
     ADCP = process_adcp.soundspeed_correction(ADCP)
     ADCP = process_adcp.remove_outliers(ADCP, options)
     ADCP = process_adcp.correct_shear(ADCP, options)
-    ADCP = process_adcp.correct_backscatter(ADCP, data)
+    ADCP = process_adcp.correct_backscatter(ADCP, data, options)
     ADCP = process_adcp.regridADCPdata(ADCP, options)
     ADCP = process_adcp.calcXYZfrom3beam(ADCP, options)
     ADCP = process_adcp.calcENUfromXYZ(ADCP, data, options)
 
     # get your gridded shear here
-    xaxis, yaxis, taxis, days = process_adcp.grid_shear_data(ADCP, data)
+    xaxis, yaxis, taxis, days = process_adcp.grid_shear_data(ADCP, data, options)
     out = process_adcp.grid_data(ADCP, data, {}, xaxis, yaxis)
 
     ds = process_adcp.make_dataset(out)
@@ -56,13 +57,12 @@ def test_processing():
     data["NAV_RESOURCE"] = extra_data["NAV_RESOURCE"]
     data["diveNum"] = extra_data["diveNum"]
 
-    process_adcp.plot_subsurface_movement(ADCP, data)
-    data = process_adcp.get_DAC(ADCP, data)
-    dE, dN, dT = process_adcp.getSurfaceDrift(data)
+    data = process_adcp.get_DAC(ADCP, data, options)
+    dE, dN, dT = process_adcp.getSurfaceDrift(data, options)
     ADCP = process_adcp.bottom_track(ADCP, adcp_path, options)
-    out = process_adcp.verify_bottom_track(ADCP, data, dE, dN, dT, xaxis, yaxis, taxis)
+    out = process_adcp.reference_shear(ADCP, data, dE, dN, dT, xaxis, yaxis, taxis, options)
     out = process_adcp.grid_data(ADCP, data, out, xaxis, yaxis)
-    out = process_adcp.calc_bias(out, yaxis, taxis, days)
+    out = process_adcp.calc_bias(out, yaxis, taxis, days, options)
 
     ds = process_adcp.make_dataset(out)
     ds_min = ds[['ADCP_E', 'ADCP_N']]

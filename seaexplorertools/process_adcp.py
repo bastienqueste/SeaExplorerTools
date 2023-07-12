@@ -235,7 +235,7 @@ def remapADCPdepth(ADCP, options):
         * np.tile(np.cos(theta_rad_4), (len(ADCP.bin), 1)).T
         )
 
-    if options['debug']:
+    if options['debug_plots']:
         plt.close('all')
         plt.figure(figsize=(20, 4))
         x = np.arange(300)
@@ -355,48 +355,49 @@ def _heading_correction(ADCP, glider, options):
 
     magx, magy, magz = calibrate(MagX.values, MagY.values, MagZ.values, coeffs)
     cal_heading = heading(magx, magy, magz)
+    if options['debug_plots']:
 
-    plt.figure(figsize=(15, 15))
+        plt.figure(figsize=(15, 15))
 
-    plt.subplot(411)
-    plt.plot(circ(cal_heading - ADCP.Heading), '-k')
-    plt.plot(circ(cal_heading - heading(MagX.values, MagY.values, MagZ.values)), ':y', alpha=0.4)
-    plt.plot(circ(ADCP.Heading - heading(MagX.values, MagY.values, MagZ.values)), '-r.', alpha=0.3)
-    plt.ylim([-15, 15])
+        plt.subplot(411)
+        plt.plot(circ(cal_heading - ADCP.Heading), '-k')
+        plt.plot(circ(cal_heading - heading(MagX.values, MagY.values, MagZ.values)), ':y', alpha=0.4)
+        plt.plot(circ(ADCP.Heading - heading(MagX.values, MagY.values, MagZ.values)), '-r.', alpha=0.3)
+        plt.ylim([-15, 15])
 
-    plt.subplot(434)
-    plt.plot(norm(MagX.values, MagY.values, MagZ.values), '-k')
-    plt.plot(norm(magx, magy, magz), '-b')
-    plt.axhline(target)
+        plt.subplot(434)
+        plt.plot(norm(MagX.values, MagY.values, MagZ.values), '-k')
+        plt.plot(norm(magx, magy, magz), '-b')
+        plt.axhline(target)
 
-    plt.subplot(435)
-    _ = plt.hist(norm(magx, magy, magz), 100, color='b', alpha=0.5)
-    _ = plt.hist(norm(MagX.values, MagY.values, MagZ.values), 100, color='r', alpha=0.5)
+        plt.subplot(435)
+        _ = plt.hist(norm(magx, magy, magz), 100, color='b', alpha=0.5)
+        _ = plt.hist(norm(MagX.values, MagY.values, MagZ.values), 100, color='r', alpha=0.5)
 
-    plt.subplot(436)
-    _ = plt.hist(cal_heading - ADCP.Heading, np.linspace(-20, 20, 100))
+        plt.subplot(436)
+        _ = plt.hist(cal_heading - ADCP.Heading, np.linspace(-20, 20, 100))
 
-    plt.subplot(437)
-    plt.axvline(0, color='k')
-    plt.axhline(0, color='k')
-    idx = MagZ.values > 0
-    plt.scatter(MagX.values[idx], MagY.values[idx], 1, 'r')
-    plt.scatter(magx[idx], magy[idx], 1, 'b')
-    plt.title('MagZ > 0')
-    plt.xlabel('MagX')
-    plt.ylabel('MagY')
-    plt.axis('square')
+        plt.subplot(437)
+        plt.axvline(0, color='k')
+        plt.axhline(0, color='k')
+        idx = MagZ.values > 0
+        plt.scatter(MagX.values[idx], MagY.values[idx], 1, 'r')
+        plt.scatter(magx[idx], magy[idx], 1, 'b')
+        plt.title('MagZ > 0')
+        plt.xlabel('MagX')
+        plt.ylabel('MagY')
+        plt.axis('square')
 
-    plt.subplot(438)
-    plt.axvline(0, color='k')
-    plt.axhline(0, color='k')
-    idx = MagZ.values < 0
-    plt.scatter(MagX.values[idx], MagY.values[idx], 1, 'r')
-    plt.scatter(magx[idx], magy[idx], 1, 'b')
-    plt.title('MagZ < 0')
-    plt.xlabel('MagX')
-    plt.ylabel('MagY')
-    plt.axis('square')
+        plt.subplot(438)
+        plt.axvline(0, color='k')
+        plt.axhline(0, color='k')
+        idx = MagZ.values < 0
+        plt.scatter(MagX.values[idx], MagY.values[idx], 1, 'r')
+        plt.scatter(magx[idx], magy[idx], 1, 'b')
+        plt.title('MagZ < 0')
+        plt.xlabel('MagX')
+        plt.ylabel('MagY')
+        plt.axis('square')
 
     return cal_heading
 
@@ -430,7 +431,7 @@ def soundspeed_correction(ADCP):
 
 
 def remove_outliers(ADCP, options):
-    if options['debug']:
+    if options['debug_plots']:
         plt.figure(figsize=(20, 5))
         ADCP['VelocityBeam1'].differentiate(coord='Velocity Range').mean(dim='time').plot()
         ADCP['VelocityBeam2'].differentiate(coord='Velocity Range').mean(dim='time').plot()
@@ -484,7 +485,7 @@ def remove_outliers(ADCP, options):
 
         ADCP['VelocityBeam' + beam] = ADCP['VelocityBeam' + beam] * C * A * V
 
-    if options['debug']:
+    if options['debug_plots']:
         plt.figure(figsize=(20, 10))
         ADCP['VelocityBeam1'].differentiate(coord='Velocity Range').mean(dim='time').plot()
         ADCP['VelocityBeam2'].differentiate(coord='Velocity Range').mean(dim='time').plot()
@@ -705,19 +706,20 @@ def _shear_correction(ADCP, var, correct=True):
 
 def correct_shear(ADCP, options):
     ADCP = do_beam2xyzz(ADCP)
-    plotit(ADCP)
+    if options["debug_plots"]:
+        plotit(ADCP)
 
     if options['correctZZshear']: ADCP = do_beam2xyzz(ADCP); _shear_correction(ADCP, 'ZZ4'); ADCP = do_xyzz2beam(ADCP);
     if options['correctZshear']: ADCP = do_beam2xyzz(ADCP); _shear_correction(ADCP, 'Z4'); ADCP = do_xyzz2beam(ADCP);
     if options['correctYshear']: ADCP = do_beam2xyzz(ADCP); _shear_correction(ADCP, 'Y4'); ADCP = do_xyzz2beam(ADCP);
     if options['correctXshear']: ADCP = do_beam2xyzz(ADCP); _shear_correction(ADCP, 'X4'); ADCP = do_xyzz2beam(ADCP);
 
-    if options['correctZZshear'] or options['correctZshear'] or options['correctYshear'] or options[
-        'correctXshear']: plotit(ADCP);
+    if (options['correctZZshear'] or options['correctZshear'] or options['correctYshear'] or options[
+        'correctXshear']) and options["debug_plots"]: plotit(ADCP);
     return ADCP
 
 
-def correct_backscatter(ADCP, glider):
+def correct_backscatter(ADCP, glider, options):
     # https://www.sciencedirect.com/science/article/pii/S0278434304002171#fig2
     # 2.1. Intensity correction
 
@@ -797,9 +799,9 @@ def correct_backscatter(ADCP, glider):
         ADCP['AmplitudeNew' + beam] = (['time', 'bin'], (
                     ADCP['AmplitudeBeam' + beam] + 2 * ADCP['AcousticAttenuation'] * ADCP[
                 'BeamRange' + beam]).values)  # + 20 int(particule attenuation,range)
-
-    ADCP['AmplitudeBeam1'].mean('time').plot(color='k')
-    ADCP['AmplitudeNew1'].mean('time').plot(color='r')
+    if options['debug_plots']:
+        ADCP['AmplitudeBeam1'].mean('time').plot(color='k')
+        ADCP['AmplitudeNew1'].mean('time').plot(color='r')
     return ADCP
 
 
@@ -819,14 +821,14 @@ def regridADCPdata(ADCP, options, depth_offsets=None):
 
         max_bin = np.argmin(abs(np.nanmean([means[x] for x in range(4)], axis=0) - threshold))
         max_distance = blanking_distance + max_bin * bin_size + 0.5 * bin_size
-
-        plt.close('all')
-        plt.figure(figsize=(15, 7))
-        [plt.plot(ADCP['Correlation Range'].values, means[x], '-k') for x in range(4)]
-        [plt.plot(ADCP['Correlation Range'].values, means[x] + stds[x], ':r') for x in range(4)]
-        [plt.plot(ADCP['Correlation Range'].values, means[x] - stds[x], ':r') for x in range(4)]
-        plt.axvline(max_bin, color='g')
-        plt.title('Bin correlations')
+        if options['debug_plots']:
+            plt.close('all')
+            plt.figure(figsize=(15, 7))
+            [plt.plot(ADCP['Correlation Range'].values, means[x], '-k') for x in range(4)]
+            [plt.plot(ADCP['Correlation Range'].values, means[x] + stds[x], ':r') for x in range(4)]
+            [plt.plot(ADCP['Correlation Range'].values, means[x] - stds[x], ':r') for x in range(4)]
+            plt.axvline(max_bin, color='g')
+            plt.title('Bin correlations')
 
         return np.arange(0, max_distance + bin_size, bin_size / 2) * direction
 
@@ -874,7 +876,7 @@ def regridADCPdata(ADCP, options, depth_offsets=None):
                                              - np.tile(depth_offsets, (len(ADCP.time), 1))
                                              )})
 
-    if options['debug']:
+    if options['debug_plots']:
         plt.figure(figsize=(20, 5))
         ADCP['V1'].differentiate(coord='depth_offset').mean(dim='time').plot()
         ADCP['V2'].differentiate(coord='depth_offset').mean(dim='time').plot()
@@ -955,53 +957,54 @@ def calcXYZfrom3beam(ADCP, options):
     ADCP['X'] = (['time', 'gridded_bin'], X)
     ADCP['Y'] = (['time', 'gridded_bin'], Y)
     ADCP['Z'] = (['time', 'gridded_bin'], Z)
+    if options['debug_plots']:
 
-    plt.close('all')
+        plt.close('all')
 
-    plt.figure(figsize=(25, 5))
-    plt.subplot(131)
-    _ = plt.hist(X[upcasts, :].flatten(), np.linspace(-1, 1, 100) / 2, color='b', alpha=0.4)
-    _ = plt.hist(X[~upcasts, :].flatten(), np.linspace(-1, 1, 100) / 2, color='y', alpha=0.4)
-    plt.axvline(0)
-    plt.title('Both X histograms should more or less overlap, and more importantly: be negative')
+        plt.figure(figsize=(25, 5))
+        plt.subplot(131)
+        _ = plt.hist(X[upcasts, :].flatten(), np.linspace(-1, 1, 100) / 2, color='b', alpha=0.4)
+        _ = plt.hist(X[~upcasts, :].flatten(), np.linspace(-1, 1, 100) / 2, color='y', alpha=0.4)
+        plt.axvline(0)
+        plt.title('Both X histograms should more or less overlap, and more importantly: be negative')
 
-    plt.subplot(132)
-    _ = plt.hist(Y[upcasts, :].flatten(), np.linspace(-1, 1, 100) / 5, color='b', alpha=0.4)
-    _ = plt.hist(Y[~upcasts, :].flatten(), np.linspace(-1, 1, 100) / 5, color='y', alpha=0.4)
-    plt.axvline(0)
-    plt.title('Both Y histograms should more or less overlap')
+        plt.subplot(132)
+        _ = plt.hist(Y[upcasts, :].flatten(), np.linspace(-1, 1, 100) / 5, color='b', alpha=0.4)
+        _ = plt.hist(Y[~upcasts, :].flatten(), np.linspace(-1, 1, 100) / 5, color='y', alpha=0.4)
+        plt.axvline(0)
+        plt.title('Both Y histograms should more or less overlap')
 
-    plt.subplot(133)
-    _ = plt.hist(Z[upcasts, :].flatten(), np.linspace(-1, 1, 100) / 10, color='b', alpha=0.4)
-    _ = plt.hist(Z[~upcasts, :].flatten(), np.linspace(-1, 1, 100) / 10, color='y', alpha=0.4)
-    plt.axvline(0)
-    plt.title('Both Z histograms should be opposite')
+        plt.subplot(133)
+        _ = plt.hist(Z[upcasts, :].flatten(), np.linspace(-1, 1, 100) / 10, color='b', alpha=0.4)
+        _ = plt.hist(Z[~upcasts, :].flatten(), np.linspace(-1, 1, 100) / 10, color='y', alpha=0.4)
+        plt.axvline(0)
+        plt.title('Both Z histograms should be opposite')
 
-    plt.figure(figsize=(9, 9))
-    plt.subplot(411)
-    _ = plt.hist(ADCP['X'].mean(dim='gridded_bin').values.flatten() - ADCP['X4'].mean(dim='bin').values.flatten(),
-                 np.linspace(-1, 1, 100) / 20, color='r', alpha=0.5)
-    plt.axvline(0)
+        plt.figure(figsize=(9, 9))
+        plt.subplot(411)
+        _ = plt.hist(ADCP['X'].mean(dim='gridded_bin').values.flatten() - ADCP['X4'].mean(dim='bin').values.flatten(),
+                     np.linspace(-1, 1, 100) / 20, color='r', alpha=0.5)
+        plt.axvline(0)
 
-    plt.subplot(412)
-    _ = plt.hist(ADCP['Y'].mean(dim='gridded_bin').values.flatten() - ADCP['Y4'].mean(dim='bin').values.flatten(),
-                 np.linspace(-1, 1, 100) / 20, color='r', alpha=0.5)
-    plt.axvline(0)
+        plt.subplot(412)
+        _ = plt.hist(ADCP['Y'].mean(dim='gridded_bin').values.flatten() - ADCP['Y4'].mean(dim='bin').values.flatten(),
+                     np.linspace(-1, 1, 100) / 20, color='r', alpha=0.5)
+        plt.axvline(0)
 
-    plt.subplot(413)
-    _ = plt.hist(ADCP['Z'].mean(dim='gridded_bin').values.flatten() - ADCP['Z4'].mean(dim='bin').values.flatten(),
-                 np.linspace(-1, 1, 100) / 20, color='r', alpha=0.5)
-    _ = plt.hist(ADCP['Z'].mean(dim='gridded_bin').values.flatten() - ADCP['ZZ4'].mean(dim='bin').values.flatten(),
-                 np.linspace(-1, 1, 100) / 20, color='b', alpha=0.5)
-    plt.axvline(0)
+        plt.subplot(413)
+        _ = plt.hist(ADCP['Z'].mean(dim='gridded_bin').values.flatten() - ADCP['Z4'].mean(dim='bin').values.flatten(),
+                     np.linspace(-1, 1, 100) / 20, color='r', alpha=0.5)
+        _ = plt.hist(ADCP['Z'].mean(dim='gridded_bin').values.flatten() - ADCP['ZZ4'].mean(dim='bin').values.flatten(),
+                     np.linspace(-1, 1, 100) / 20, color='b', alpha=0.5)
+        plt.axvline(0)
 
-    plt.subplot(414)
-    _ = plt.hist(ADCP['ZZ4'].mean(dim='bin').values.flatten() - ADCP['Z4'].mean(dim='bin').values.flatten(),
-                 np.linspace(-1, 1, 100) / 20, color='r', alpha=0.5)
+        plt.subplot(414)
+        _ = plt.hist(ADCP['ZZ4'].mean(dim='bin').values.flatten() - ADCP['Z4'].mean(dim='bin').values.flatten(),
+                     np.linspace(-1, 1, 100) / 20, color='r', alpha=0.5)
 
     plog('Calculating X,Y,Z from isobaric 3-beam measurements.')
 
-    if options['debug']:
+    if options['debug_plots']:
         plt.figure()
         plt.plot(np.nansum(~np.isnan(ADCP['X']), 0), ':b')
         plt.plot(np.nansum(~np.isnan(ADCP['Y']), 0), '-y')
@@ -1076,15 +1079,16 @@ def calcENUfromXYZ(ADCP, glider, options):
     ##### PLOT 1
     U = ADCP.isel(time=_gd)['U'].mean(dim='gridded_bin').values.flatten()
     dP = np.gradient(ADCP.isel(time=_gd)['Depth'].values, ADCP.isel(time=_gd)['time'].astype('float') / 1e9)
+    if options['debug_plots']:
 
-    plt.figure(figsize=(10, 3))
-    plt.plot(dP, '-k', alpha=0.5, label='dP/dt')
-    plt.plot(U, ':r', alpha=0.5, label='ADCP U')
-    plt.ylim([-0.3, 0.3])
-    plt.legend()
+        plt.figure(figsize=(10, 3))
+        plt.plot(dP, '-k', alpha=0.5, label='dP/dt')
+        plt.plot(U, ':r', alpha=0.5, label='ADCP U')
+        plt.ylim([-0.3, 0.3])
+        plt.legend()
 
-    plt.figure()
-    plt.scatter(ADCP['Longitude'].isel(time=_gd).values, ADCP['Latitude'].isel(time=_gd).values)
+        plt.figure()
+        plt.scatter(ADCP['Longitude'].isel(time=_gd).values, ADCP['Latitude'].isel(time=_gd).values)
 
     ADCP['Sh_E'] = (['time', 'gridded_bin'],
                     ADCP['E'].differentiate('gridded_bin').values
@@ -1105,12 +1109,12 @@ def calcENUfromXYZ(ADCP, glider, options):
     isnan = np.isnan(SHEm)
     SHEm = np.nancumsum(SHEm[::-1, :], 0)[::-1, :]
     SHEm[isnan] = np.NaN
-
-    plt.figure(figsize=(25, 12))
-    plt.pcolormesh(XI, YI, SHEm)
-    plt.gca().invert_yaxis()
-    plt.colorbar()
-    plt.clim(np.array([-1, 1]) * 0.1)
+    if options['debug_plots']:
+        plt.figure(figsize=(25, 12))
+        plt.pcolormesh(XI, YI, SHEm)
+        plt.gca().invert_yaxis()
+        plt.colorbar()
+        plt.clim(np.array([-1, 1]) * 0.1)
 
     return ADCP
 
@@ -1148,7 +1152,6 @@ def plot_subsurface_movement(ADCP, glider):
     Lat = np.gradient(Lat)  # Lat[np.abs(Lat) > 5] = 0;
     Lon = np.nancumsum(Lon)
     Lat = np.nancumsum(Lat)
-
     plt.figure(figsize=(10, 10))
     # plt.scatter(Lon, Lat, 20, ADCP['Pressure'].isel(time=_gd).values)
     # plt.colorbar()
@@ -1217,7 +1220,7 @@ def verify_calcENUfromXYZ(ADCP):
     plt.gca().invert_yaxis()
 
 
-def get_DAC(ADCP, glider):
+def get_DAC(ADCP, glider, options):
     ## Calculate full x-y dead reckoning during each dive
     def reset_transport_at_GPS(arr):
         ffill = lambda arr: pd.DataFrame(arr).fillna(method='ffill').values.flatten()
@@ -1292,12 +1295,6 @@ def get_DAC(ADCP, glider):
 
     dac_e = (gps_e - dr_e) / dt
     dac_n = (gps_n - dr_n) / dt
-
-    plt.figure(figsize=(15, 6))
-    plt.plot(pd.to_datetime(meant), dac_e, 'o-r')
-    plt.plot(pd.to_datetime(meant), dac_n, 'o-b')
-    plt.legend(('DAC E', 'DAC N'))
-
     glider['DAC_E'] = interp(meant, (gps_e - dr_e) / dt, t)
     glider['DAC_N'] = interp(meant, (gps_n - dr_n) / dt, t)
 
@@ -1307,24 +1304,29 @@ def get_DAC(ADCP, glider):
     plt.figure(figsize=(15, 7))
 
     E, X, Y = grid2d(glider.time.values.astype('float'), glider.latitude, glider.DAC_E,
-                        xi=10 ** 9 * 60 * 60 * 3, yi=0.01)
+                     xi=10 ** 9 * 60 * 60 * 3, yi=0.01)
 
     N, X, Y = grid2d(glider.time.values.astype('float'), glider.latitude, glider.DAC_N,
-                        xi=10 ** 9 * 60 * 60 * 3, yi=0.01)
+                     xi=10 ** 9 * 60 * 60 * 3, yi=0.01)
+    if options['debug_plots']:
+        plt.figure(figsize=(15, 6))
+        plt.plot(pd.to_datetime(meant), dac_e, 'o-r')
+        plt.plot(pd.to_datetime(meant), dac_n, 'o-b')
+        plt.legend(('DAC E', 'DAC N'))
 
-    plt.subplot(211)
-    plt.scatter(X, Y, 100, E, cmap=cmo.balance)
-    plt.colorbar()
-    plt.title('East')
+        plt.subplot(211)
+        plt.scatter(X, Y, 100, E, cmap=cmo.balance)
+        plt.colorbar()
+        plt.title('East')
 
-    plt.subplot(212)
-    plt.scatter(X, Y, 100, N, cmap=cmo.balance)
-    plt.colorbar()
-    plt.title('North')
+        plt.subplot(212)
+        plt.scatter(X, Y, 100, N, cmap=cmo.balance)
+        plt.colorbar()
+        plt.title('North')
     return glider
 
 
-def getSurfaceDrift(glider):
+def getSurfaceDrift(glider, options):
     _gps = (glider.DeadReckoning.values < 1) & (glider.NAV_RESOURCE.values == 116)
 
     lon2m = lambda x, y: gsw.distance([x, x + 1], [y, y])
@@ -1356,14 +1358,14 @@ def getSurfaceDrift(glider):
         dT[idx] = np.nanmean(times[_gd])
 
     dT = dT * 10 ** 9
-
-    plt.figure(figsize=(15, 7))
-    plt.subplot(211)
-    plt.plot(pd.to_datetime(dT), dE, '.-r')
-    plt.title('U')
-    plt.subplot(212)
-    plt.plot(pd.to_datetime(dT), dN, '.-r')
-    plt.title('V')
+    if options['debug_plots']:
+        plt.figure(figsize=(15, 7))
+        plt.subplot(211)
+        plt.plot(pd.to_datetime(dT), dE, '.-r')
+        plt.title('U')
+        plt.subplot(212)
+        plt.plot(pd.to_datetime(dT), dN, '.-r')
+        plt.title('V')
 
     return dE, dN, dT
 
@@ -1483,7 +1485,7 @@ def bottom_track(ADCP, adcp_path, options):
     return ADCP
 
 
-def grid_shear_data(ADCP, glider):
+def grid_shear_data(ADCP, glider, options):
     x = np.arange(0,np.shape(ADCP.Sh_E.values)[0],1)
 
     SHEm,XI,YI = grid2d(
@@ -1501,32 +1503,33 @@ def grid_shear_data(ADCP, glider):
         ADCP.bin_depth.values[x,:].flatten(), 
         ADCP.Sh_E.values[x,:].flatten(), 
         xi=1, yi=5, fn='count')
+    if options['debug_plots']:
 
-    plt.figure(figsize=(45,20))
+        plt.figure(figsize=(45,20))
 
-    plt.subplot(221)
-    plt.pcolormesh(XI,YI,SHEs/np.sqrt(SHEn))
-    plt.colorbar()
-    # plt.clim([0,300])
-    plt.ylim([0,500])
-    plt.gca().invert_yaxis()
+        plt.subplot(221)
+        plt.pcolormesh(XI,YI,SHEs/np.sqrt(SHEn))
+        plt.colorbar()
+        # plt.clim([0,300])
+        plt.ylim([0,500])
+        plt.gca().invert_yaxis()
 
-    plt.subplot(223)
-    plt.pcolormesh(XI,YI,SHEm,cmap=cmo.balance)
-    plt.colorbar()
-    plt.ylim([0,500])
-    plt.clim([-0.05,0.05])
-    plt.gca().invert_yaxis()
+        plt.subplot(223)
+        plt.pcolormesh(XI,YI,SHEm,cmap=cmo.balance)
+        plt.colorbar()
+        plt.ylim([0,500])
+        plt.clim([-0.05,0.05])
+        plt.gca().invert_yaxis()
 
-    plt.subplot(224)
-    plt.pcolormesh(XI,YI,SHEn)
-    plt.colorbar()
-    plt.ylim([0,500])
-    # plt.clim([0,0.01])
-    plt.gca().invert_yaxis()
+        plt.subplot(224)
+        plt.pcolormesh(XI,YI,SHEn)
+        plt.colorbar()
+        plt.ylim([0,500])
+        # plt.clim([0,0.01])
+        plt.gca().invert_yaxis()
 
-    plt.subplot(222)
-    _ = plt.hist(SHEs.flatten(), np.linspace(0,0.05,100))
+        plt.subplot(222)
+        _ = plt.hist(SHEs.flatten(), np.linspace(0,0.05,100))
 
     yaxis = np.arange(0, np.nanmax(np.ceil(glider.pressure.values)), y_res)
     xaxis = glider.date_float.groupby(glider.profile_number).agg('mean').index
@@ -1535,12 +1538,12 @@ def grid_shear_data(ADCP, glider):
     return xaxis, yaxis, taxis, days
 
 
-def verify_bottom_track(ADCP, glider, dE, dN, dT, xaxis, yaxis, taxis):
+def reference_shear(ADCP, glider, dE, dN, dT, xaxis, yaxis, taxis, options):
     out = {}
 
     var = ['E', 'N']
-
-    plt.figure(figsize=(20, 20))
+    if options['debug_plots']:
+        plt.figure(figsize=(20, 20))
 
     days = np.unique(glider.time.round('D'))
     for pstep in range(len(var)):
@@ -1596,76 +1599,76 @@ def verify_bottom_track(ADCP, glider, dE, dN, dT, xaxis, yaxis, taxis):
         # Now we reference the velocity
         V = V + np.tile(Ref, (np.shape(V)[0], 1))
         out['ADCP_' + letter] = V
+        if options['debug_plots']:
+            ## PLOT 1
+            plt.subplot(6, 1, pstep + 1)
+            plt.pcolormesh(taxis, yaxis, V, cmap=cmo.balance, shading='auto')
+            plt.clim(np.array([-1, 1]) * 0.5)
+            plt.colorbar()
+            [plt.axvline(x, color='k', alpha=0.3) for x in days]
+            plt.contour(taxis, yaxis, SA, np.linspace(35.5, 38.5, 6), colors='k', alpha=0.3)
+            plt.gca().invert_yaxis()
+            plt.xlabel('Yo number')
+            plt.xlabel('Depth')
+            plt.title(letter + '-ward velocity (m.s-1)')
 
-        ## PLOT 1
-        plt.subplot(6, 1, pstep + 1)
-        plt.pcolormesh(taxis, yaxis, V, cmap=cmo.balance, shading='auto')
-        plt.clim(np.array([-1, 1]) * 0.5)
-        plt.colorbar()
-        [plt.axvline(x, color='k', alpha=0.3) for x in days]
-        plt.contour(taxis, yaxis, SA, np.linspace(35.5, 38.5, 6), colors='k', alpha=0.3)
-        plt.gca().invert_yaxis()
-        plt.xlabel('Yo number')
-        plt.xlabel('Depth')
-        plt.title(letter + '-ward velocity (m.s-1)')
+            ## PLOT 3
+            plt.subplot(6, 2, pstep + 7)
+            plt.plot(taxis, np.nanmean(V, axis=0), '-k', alpha=0.5, linewidth=3)
+            plt.plot(taxis, np.nanmean(DAC, axis=0), ':y', alpha=0.5, linewidth=3)
+            plt.legend(('ADCP ' + letter, 'DAC ' + letter))
+            plt.ylim([-0.2, 0.2])
 
-        ## PLOT 3
-        plt.subplot(6, 2, pstep + 7)
-        plt.plot(taxis, np.nanmean(V, axis=0), '-k', alpha=0.5, linewidth=3)
-        plt.plot(taxis, np.nanmean(DAC, axis=0), ':y', alpha=0.5, linewidth=3)
-        plt.legend(('ADCP ' + letter, 'DAC ' + letter))
-        plt.ylim([-0.2, 0.2])
+            ## PLOT 4
+            plt.subplot(6, 2, pstep + 9)
+            max_depth = 26
+            _gd = np.isfinite(dN + dE)
+            if pstep == 0:
+                plt.plot(pd.to_datetime(dT[_gd]), dE[_gd], ':g', alpha=0.8)
+            else:
+                plt.plot(pd.to_datetime(dT[_gd]), dN[_gd], ':g', alpha=0.8)
+            V_surf = np.nanmean(V[:max_depth, :], axis=0)
+            plt.plot(taxis[np.isfinite(V_surf)], V_surf[np.isfinite(V_surf)], '-k', alpha=0.5)
+            plt.legend(('Surf. drift ' + letter, 'Near surf. ADCP ' + letter))
+            plt.ylim([-0.5, 0.5])
 
-        ## PLOT 4
-        plt.subplot(6, 2, pstep + 9)
-        max_depth = 26
-        _gd = np.isfinite(dN + dE)
-        if pstep == 0:
-            plt.plot(pd.to_datetime(dT[_gd]), dE[_gd], ':g', alpha=0.8)
-        else:
-            plt.plot(pd.to_datetime(dT[_gd]), dN[_gd], ':g', alpha=0.8)
-        V_surf = np.nanmean(V[:max_depth, :], axis=0)
-        plt.plot(taxis[np.isfinite(V_surf)], V_surf[np.isfinite(V_surf)], '-k', alpha=0.5)
-        plt.legend(('Surf. drift ' + letter, 'Near surf. ADCP ' + letter))
-        plt.ylim([-0.5, 0.5])
+            ## PLOT 5
+            plt.subplot(6, 2, pstep + 11)
 
-        ## PLOT 5
-        plt.subplot(6, 2, pstep + 11)
+            indices = np.flip(np.cumsum(np.flip(np.full_like(V, 1) * np.isfinite(V), axis=0), axis=0), axis=0)
+            indices[indices > 10] = np.NaN
+            indices[np.isfinite(indices)] = 1
+            bottom_V = np.nanmean(V * indices, axis=0)
+            plt.plot(taxis, RunningMean(bottom_V, 1), '-r', alpha=0.8)
 
-        indices = np.flip(np.cumsum(np.flip(np.full_like(V, 1) * np.isfinite(V), axis=0), axis=0), axis=0)
-        indices[indices > 10] = np.NaN
-        indices[np.isfinite(indices)] = 1
-        bottom_V = np.nanmean(V * indices, axis=0)
-        plt.plot(taxis, RunningMean(bottom_V, 1), '-r', alpha=0.8)
+            ind = np.arange(len(ADCP['time']))  # np.isfinite(ADCP['BT_'+letter].values)
+            bt_t = ADCP['time'].isel(time=ind).values
+            bt = (ADCP[letter] - ADCP['BT_' + letter]).isel(time=ind).mean('gridded_bin').values
+            bt_std = (ADCP[letter] - ADCP['BT_' + letter]).isel(time=ind).std('gridded_bin').values
 
-        ind = np.arange(len(ADCP['time']))  # np.isfinite(ADCP['BT_'+letter].values)
-        bt_t = ADCP['time'].isel(time=ind).values
-        bt = (ADCP[letter] - ADCP['BT_' + letter]).isel(time=ind).mean('gridded_bin').values
-        bt_std = (ADCP[letter] - ADCP['BT_' + letter]).isel(time=ind).std('gridded_bin').values
+            bt_smooth = 30
+            plt.plot(bt_t, RunningMean(bt, bt_smooth), '-k', marker='.', alpha=0.3)
+            plt.ylim([-0.15, 0.15])
+            plt.legend(('ADCP near bottom ' + letter, 'Bottom track ' + letter))
 
-        bt_smooth = 30
-        plt.plot(bt_t, RunningMean(bt, bt_smooth), '-k', marker='.', alpha=0.3)
-        plt.ylim([-0.15, 0.15])
-        plt.legend(('ADCP near bottom ' + letter, 'Bottom track ' + letter))
+            ## PLOT 2
+            plt.subplot(6, 2, pstep + 5)
+            plt.plot(taxis, np.nanmean(V, axis=0) - np.nanmean(DAC, axis=0), '-k', alpha=0.8, linewidth=1)
 
-        ## PLOT 2
-        plt.subplot(6, 2, pstep + 5)
-        plt.plot(taxis, np.nanmean(V, axis=0) - np.nanmean(DAC, axis=0), '-k', alpha=0.8, linewidth=1)
+            if pstep == 0:
+                plt.plot(pd.to_datetime(dT[_gd]),
+                         dE[_gd] - interp(taxis[np.isfinite(V_surf)].values.astype('float'), V_surf[np.isfinite(V_surf)],
+                                          dT[_gd]), '-g', alpha=0.8)
+            else:
+                plt.plot(pd.to_datetime(dT[_gd]),
+                         dN[_gd] - interp(taxis[np.isfinite(V_surf)].values.astype('float'), V_surf[np.isfinite(V_surf)],
+                                          dT[_gd]), '-g', alpha=0.8)
 
-        if pstep == 0:
-            plt.plot(pd.to_datetime(dT[_gd]),
-                     dE[_gd] - interp(taxis[np.isfinite(V_surf)].values.astype('float'), V_surf[np.isfinite(V_surf)],
-                                      dT[_gd]), '-g', alpha=0.8)
-        else:
-            plt.plot(pd.to_datetime(dT[_gd]),
-                     dN[_gd] - interp(taxis[np.isfinite(V_surf)].values.astype('float'), V_surf[np.isfinite(V_surf)],
-                                      dT[_gd]), '-g', alpha=0.8)
+            plt.plot(bt_t, RunningMean(bt, bt_smooth) - interp(taxis.values.astype('float'), RunningMean(bottom_V, 1),
+                                                               bt_t.astype('float')), ':r', marker='.', alpha=0.5)
 
-        plt.plot(bt_t, RunningMean(bt, bt_smooth) - interp(taxis.values.astype('float'), RunningMean(bottom_V, 1),
-                                                           bt_t.astype('float')), ':r', marker='.', alpha=0.5)
-
-        plt.legend(('DAC error ' + letter, 'Drift error ' + letter, 'BT error ' + letter))
-        plt.ylim([-0.2, 0.2])
+            plt.legend(('DAC error ' + letter, 'Drift error ' + letter, 'BT error ' + letter))
+            plt.ylim([-0.2, 0.2])
     return out
 
 
@@ -1816,7 +1819,7 @@ def verify_depth_bias(out, yaxis, E='ADCP_E', N='ADCP_N'):
     plt.title('MAG')
 
 
-def calc_bias(out, yaxis, taxis, days):
+def calc_bias(out, yaxis, taxis, days, options):
     def get_bias(glider_speed, coeff):
         r, c = np.shape(glider_speed)
         bias = np.nancumsum(glider_speed, axis=0)
@@ -1847,43 +1850,45 @@ def calc_bias(out, yaxis, taxis, days):
 
     out['ADCP_E'] = out['ADCP_E'] + get_bias(out['speed_e'], coeff)
     out['ADCP_N'] = out['ADCP_N'] + get_bias(out['speed_n'], coeff)
+    if options['debug_plots']:
 
-    plt.figure(figsize=(15, 5))
-    plt.subplot(131)
-    plt.plot(np.nanvar(ADCP_E_old, axis=1), yaxis, '-r')
-    plt.plot(np.nanvar(out['ADCP_E'], axis=1), yaxis, '-g')
-    plt.subplot(132)
-    plt.plot(np.nanvar(ADCP_N_old, axis=1), yaxis, '-r')
-    plt.plot(np.nanvar(out['ADCP_N'], axis=1), yaxis, '-g')
-    plt.subplot(133)
-    plt.plot(np.nanvar(np.sqrt(ADCP_E_old ** 2 + ADCP_N_old ** 2), axis=1), yaxis, '-r')
-    plt.plot(np.nanvar(np.sqrt(out['ADCP_E'] ** 2 + out['ADCP_N'] ** 2), axis=1), yaxis, '-g')
+        plt.figure(figsize=(15, 5))
+        plt.subplot(131)
+        plt.plot(np.nanvar(ADCP_E_old, axis=1), yaxis, '-r')
+        plt.plot(np.nanvar(out['ADCP_E'], axis=1), yaxis, '-g')
+        plt.subplot(132)
+        plt.plot(np.nanvar(ADCP_N_old, axis=1), yaxis, '-r')
+        plt.plot(np.nanvar(out['ADCP_N'], axis=1), yaxis, '-g')
+        plt.subplot(133)
+        plt.plot(np.nanvar(np.sqrt(ADCP_E_old ** 2 + ADCP_N_old ** 2), axis=1), yaxis, '-r')
+        plt.plot(np.nanvar(np.sqrt(out['ADCP_E'] ** 2 + out['ADCP_N'] ** 2), axis=1), yaxis, '-g')
 
-    verify_depth_bias(out, yaxis, E='ADCP_E', N='ADCP_N')
+    if options['debug_plots']:
+        verify_depth_bias(out, yaxis, E='ADCP_E', N='ADCP_N')
 
-    plt.figure(figsize=(20, 20))
-    ## PLOT 1
-    plt.subplot(6, 1, 1)
-    plt.pcolormesh(taxis, yaxis, out['ADCP_E'], cmap=cmo.balance, shading='auto')
-    plt.clim(np.array([-1, 1]) * 0.5)
-    plt.colorbar()
-    [plt.axvline(x, color='k', alpha=0.3) for x in days]
-    plt.contour(taxis, yaxis, out['salinity'], np.linspace(35.5, 38.5, 6), colors='k', alpha=0.3)
-    plt.gca().invert_yaxis()
-    plt.xlabel('Yo number')
-    plt.xlabel('Depth')
-    plt.title('Eastward velocity (m.s-1)')
+        plt.figure(figsize=(20, 20))
+        ## PLOT 1
+        plt.subplot(6, 1, 1)
+        plt.pcolormesh(taxis, yaxis, out['ADCP_E'], cmap=cmo.balance, shading='auto')
+        plt.clim(np.array([-1, 1]) * 0.5)
+        plt.colorbar()
+        [plt.axvline(x, color='k', alpha=0.3) for x in days]
+        plt.contour(taxis, yaxis, out['salinity'], np.linspace(35.5, 38.5, 6), colors='k', alpha=0.3)
+        plt.gca().invert_yaxis()
+        plt.xlabel('Yo number')
+        plt.xlabel('Depth')
+        plt.title('Eastward velocity (m.s-1)')
 
-    plt.subplot(6, 1, 2)
-    plt.pcolormesh(taxis, yaxis, out['ADCP_E'], cmap=cmo.balance, shading='auto')
-    plt.clim(np.array([-1, 1]) * 0.5)
-    plt.colorbar()
-    [plt.axvline(x, color='k', alpha=0.3) for x in days]
-    plt.contour(taxis, yaxis, out['salinity'], np.linspace(35.5, 38.5, 6), colors='k', alpha=0.3)
-    plt.gca().invert_yaxis()
-    plt.xlabel('Yo number')
-    plt.xlabel('Depth')
-    plt.title('Northward velocity (m.s-1)')
+        plt.subplot(6, 1, 2)
+        plt.pcolormesh(taxis, yaxis, out['ADCP_E'], cmap=cmo.balance, shading='auto')
+        plt.clim(np.array([-1, 1]) * 0.5)
+        plt.colorbar()
+        [plt.axvline(x, color='k', alpha=0.3) for x in days]
+        plt.contour(taxis, yaxis, out['salinity'], np.linspace(35.5, 38.5, 6), colors='k', alpha=0.3)
+        plt.gca().invert_yaxis()
+        plt.xlabel('Yo number')
+        plt.xlabel('Depth')
+        plt.title('Northward velocity (m.s-1)')
     return out
 
 
@@ -1933,7 +1938,7 @@ def velocity_from_shear(adcp_path, glider_pqt_path, options, data, ADCP):
     data = get_DAC(ADCP, data)
     dE, dN, dT = getSurfaceDrift(data)
     ADCP = bottom_track(ADCP, adcp_path, options)
-    out = verify_bottom_track(ADCP, data, dE, dN, dT, xaxis, yaxis, taxis)
+    out = reference_shear(ADCP, data, dE, dN, dT, xaxis, yaxis, taxis)
     out = grid_data(ADCP, data, out, xaxis, yaxis)
     out = calc_bias(out, yaxis, taxis, days)
     ds = make_dataset(out)
