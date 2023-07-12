@@ -27,10 +27,6 @@ def test_processing():
     ADCP, data, ADCP_settings, options = process_adcp.load_adcp_glider_data(adcp_path, glider_pqt_path, options)
     data = data[data.diveNum < 100]
     ADCP = ADCP.where(ADCP.time < data.Timestamp.values[-1]).dropna(dim="time", how="all")
-
-    data["date_float"] = data['Timestamp'].values.astype('float')
-    data["sa"] = data["salinity"]
-    data["soundspeed"] = gsw.sound_speed(data['salinity'], data['temperature'], data['LEGATO_PRESSURE'])
     ADCP = process_adcp.remapADCPdepth(ADCP, options)
     ADCP = process_adcp.correct_heading(ADCP, data, options)
     ADCP = process_adcp.soundspeed_correction(ADCP)

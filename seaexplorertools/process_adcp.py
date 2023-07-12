@@ -46,6 +46,28 @@ y_res = 1
 def load(parquet_file):
     data = pd.read_parquet(parquet_file)
     print('Loaded ' + parquet_file)
+    sel_cols = ["Timestamp",
+    "temperature",
+    "salinity",
+    "latitude",
+    "longitude",
+    "profileNum",
+    "Declination",
+    "speed_horz",
+    "DeadReckoning",
+    "NAV_RESOURCE",
+    "diveNum",
+    "LEGATO_PRESSURE",
+    "speed_vert",
+    ]
+    data = data[sel_cols]
+    data["date_float"] = data['Timestamp'].values.astype('float')
+    p = data['LEGATO_PRESSURE']
+    SA = gsw.conversions.SA_from_SP(data.salinity, p, data.longitude, data.latitude)
+    CT = gsw.CT_from_t(SA, data["temperature"], p)
+    data["soundspeed"] = gsw.sound_speed(SA, CT, p)
+    data["sa"] = data["salinity"]
+    #data = data.rename(columns={"LEGATO_PRESSURE": "pressure", "Timestamp": "time"})
     return data
 
 
