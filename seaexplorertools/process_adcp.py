@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import cmocean.cm as cmo
 import json
-from  urllib import request
+from urllib import request
 
 warnings.filterwarnings(action='ignore', message='Mean of empty slice')
 warnings.filterwarnings(action='ignore', message='invalid value encountered in divide')
@@ -1885,3 +1885,56 @@ def calc_bias(out, yaxis, taxis, days):
     plt.xlabel('Depth')
     plt.title('Northward velocity (m.s-1)')
     return out
+
+
+def make_dataset(out):
+    profiles = np.arange(out["Pressure"].shape[1])
+    depth_bins = np.arange(out["Pressure"].shape[0])
+
+    ds_dict = {}
+    for key, val in out.items():
+        ds_dict[key] = (("depth_bin", "profile_num",), val)
+    coords_dict = {"profile_num": ("profile_num", profiles),
+                   "depth_bin": ("depth_bin", depth_bins)
+                   }
+    ds = xr.Dataset(data_vars=ds_dict, coords=coords_dict)
+    return ds
+
+
+def shear_from_adcp(adcp_path, glider_pqt_path, options):
+    ADCP, data, options = load_adcp_glider_data(adcp_path, glider_pqt_path, options)
+    ADCP = remapADCPdepth(ADCP, options)
+    ADCP = correct_heading(ADCP, data, options)
+    ADCP = soundspeed_correction(ADCP)
+    ADCP = remove_outliers(ADCP, options)
+    ADCP = correct_shear(ADCP, options)
+    ADCP = correct_backscatter(ADCP, data)
+    ADCP = regridADCPdata(ADCP, options)
+    ADCP = calcXYZfrom3beam(ADCP, options)
+    ADCP = calcENUfromXYZ(ADCP, data, options)
+    return ADCP
+
+
+def grid_shear(ADCP, data):
+    xaxis, yaxis, taxis, days = grid_shear_data(ADCP, data)
+    out = grid_data(ADCP, data, {}, xaxis, yaxis)
+    ds = make_dataset(out)
+    return ds
+
+
+def velocity_from_shear(adcp_path, glider_pqt_path, options, data, ADCP):
+    extra_data = pd.read_parquet(glider_pqt_path)
+    data["speed_vert"] = extra_data["speed_vert"]
+    data["speed_horz"] = extra_data["speed_horz"]
+    data["DeadReckoning"] = extra_data["DeadReckoning"]
+    data["NAV_RESOURCE"] = extra_data["NAV_RESOURCE"]
+    data["diveNum"] = extra_data["diveNum"]
+    xaxis, yaxis, taxis, days = grid_shear_data(ADCP, data)
+    data = get_DAC(ADCP, data)
+    dE, dN, dT = getSurfaceDrift(data)
+    ADCP = bottom_track(ADCP, adcp_path, options)
+    out = verify_bottom_track(ADCP, data, dE, dN, dT, xaxis, yaxis, taxis)
+    out = grid_data(ADCP, data, out, xaxis, yaxis)
+    out = calc_bias(out, yaxis, taxis, days)
+    ds = make_dataset(out)
+    return ds

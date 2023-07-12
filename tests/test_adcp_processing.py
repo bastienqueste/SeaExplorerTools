@@ -41,16 +41,7 @@ def test_processing():
     xaxis, yaxis, taxis, days = process_adcp.grid_shear_data(ADCP, data)
     out = process_adcp.grid_data(ADCP, data, {}, xaxis, yaxis)
 
-    profiles = np.arange(out["Pressure"].shape[1])
-    depth_bins = np.arange(out["Pressure"].shape[0])
-
-    ds_dict = {}
-    for key, val in out.items():
-        ds_dict[key] = (("depth_bin", "profile_num",), val)
-    coords_dict = {"profile_num": ("profile_num", profiles),
-                   "depth_bin": ("depth_bin", depth_bins)
-                   }
-    ds = xr.Dataset(data_vars=ds_dict, coords=coords_dict)
+    ds = process_adcp.make_dataset(out)
     ds_min = ds[['Sh_E', 'Sh_N', 'Sh_U']]
     ds_min_test = xr.open_dataset("tests/test_files/ds_out_min.nc")
     for var in list(ds_min):
@@ -73,13 +64,7 @@ def test_processing():
     out = process_adcp.grid_data(ADCP, data, out, xaxis, yaxis)
     out = process_adcp.calc_bias(out, yaxis, taxis, days)
 
-    ds_dict = {}
-    for key, val in out.items():
-        ds_dict[key] = (("depth_bin", "profile_num",), val)
-    coords_dict = {"profile_num": ("profile_num", profiles),
-                   "depth_bin": ("depth_bin", depth_bins)
-                   }
-    ds = xr.Dataset(data_vars=ds_dict, coords=coords_dict)
+    ds = process_adcp.make_dataset(out)
     ds_min = ds[['ADCP_E', 'ADCP_N']]
     for var in list(ds_min):
         assert np.allclose(ds_min[var], ds_min_test[var], equal_nan=True, atol=1e-7, rtol=1e-3)
