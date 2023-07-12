@@ -53,12 +53,13 @@ def load(parquet_file):
     "longitude",
     "profileNum",
     "Declination",
-    "speed_horz",
     "DeadReckoning",
     "NAV_RESOURCE",
     "diveNum",
     "LEGATO_PRESSURE",
+    # Only for integrated currents
     "speed_vert",
+    "speed_horz",
     ]
     data = data[sel_cols]
     data["date_float"] = data['Timestamp'].values.astype('float')
@@ -117,6 +118,7 @@ def load_adcp_glider_data(adcp_path, glider_pqt_path, options):
 
     ADCP = xr.open_mfdataset(adcp_path, group='Data/Average')
     ADCP_settings = xr.open_mfdataset(glob(adcp_path)[0], group='Config')
+    ADCP.attrs = ADCP_settings.attrs
 
     plog('Finished loading ADCP data')
     # Coordinates
@@ -166,7 +168,7 @@ def load_adcp_glider_data(adcp_path, glider_pqt_path, options):
     else:
         options['top_mounted'] = False
     plog(f'top mounted: {options["top_mounted"]}')
-    return ADCP, glider, ADCP_settings, options
+    return ADCP, glider, options
 
 
 def remapADCPdepth(ADCP, options):
@@ -490,14 +492,14 @@ def remove_outliers(ADCP, options):
     return ADCP
 
 
-def plot_data_density(ADCP, ADCP_settings):
+def plot_data_density(ADCP):
     agg_fn = lambda x: np.count_nonzero(np.isfinite(x))
 
     CNT, XI, YI = grid2d(
         np.tile(ADCP.profileNum.values, (len(ADCP.bin), 1)).T.flatten(),
         ADCP['D2'].values.flatten(),
         ADCP['VelocityBeam2'].values.flatten(),
-        xi=1, yi=np.arange(0, 1000, ADCP_settings.attrs['avg_cellSize']), fn=agg_fn)
+        xi=1, yi=np.arange(0, 1000, ADCP.attrs['avg_cellSize']), fn=agg_fn)
 
     plt.figure(figsize=(35, 12))
     plt.subplot(121)
@@ -785,10 +787,10 @@ def correct_backscatter(ADCP, glider):
     return ADCP
 
 
-def regridADCPdata(ADCP, ADCP_settings, options, depth_offsets=None):
+def regridADCPdata(ADCP, options, depth_offsets=None):
     ## This is to avoid shear smearing because of tilted ADCP
-    bin_size = ADCP_settings.attrs['avg_cellSize']
-    blanking_distance = ADCP_settings.attrs['avg_blankingDistance']
+    bin_size = ADCP.attrs['avg_cellSize']
+    blanking_distance = ADCP.attrs['avg_blankingDistance']
     ## FN: calculate isobar offsets relative to glider depth for each ping
     def calc_ideal_depth_offsets(bin_size, blanking_distance):
         if options['top_mounted']:
@@ -1053,8 +1055,8 @@ def calcENUfromXYZ(ADCP, glider, options):
 
 
 
-    _gd = (ADCP['Pressure'].values > 5) & (np.abs(ADCP['profileNum'] - 150) < 10)
 
+    _gd = (ADCP['Pressure'].values > 5) & (np.abs(ADCP['profileNum'] - 150) < 10)
     ##### PLOT 1
     U = ADCP.isel(time=_gd)['U'].mean(dim='gridded_bin').values.flatten()
     dP = np.gradient(ADCP.isel(time=_gd)['Depth'].values, ADCP.isel(time=_gd)['time'].astype('float') / 1e9)
@@ -1063,48 +1065,6 @@ def calcENUfromXYZ(ADCP, glider, options):
     plt.plot(dP, '-k', alpha=0.5, label='dP/dt')
     plt.plot(U, ':r', alpha=0.5, label='ADCP U')
     plt.ylim([-0.3, 0.3])
-    plt.legend()
-
-    ##### PLOT 2
-    deltat = np.append(np.diff(ADCP['time'].values.astype('float') / 1e9), np.NaN)
-
-    ## 3 beam E and N velocity (Opposite because glider travel is opposite to what it "sees")
-    E = -(ADCP['E'].mean(dim='gridded_bin') * deltat).isel(time=_gd)
-    N = -(ADCP['N'].mean(dim='gridded_bin') * deltat).isel(time=_gd)
-
-    ## 4 beam estimates, based on total speed through water from 4 beam adcp, adjusted iwth pitch and AOA=5 deg estimate
-    spd_thr_water = np.sqrt(ADCP['X4'] ** 2 + ADCP['Y4'] ** 2 + ADCP['ZZ4'] ** 2).mean('bin')
-    hspd = np.cos(np.deg2rad(np.abs(ADCP['Pitch']) + 5)) * spd_thr_water
-    angle = np.deg2rad(90 - ADCP['Heading'])
-    e = hspd * np.cos(angle)
-    n = hspd * np.sin(angle)
-    e = (e * deltat).isel(time=_gd)
-    n = (n * deltat).isel(time=_gd)
-
-    ## Like 4 beam estimate but using flightmodel horizontal velocity
-    ADCP['fm_horz'] = (
-    'time', interp(glider.date_float.values, glider['speed_horz'].values, ADCP['time'].values.astype('float')))
-    vg_e = (ADCP['fm_horz'] * np.sin(ADCP['Heading'].values * np.pi / 180) * deltat).isel(
-        time=_gd)  # ADCP['Heading'].values * np.pi/180
-    vg_n = (ADCP['fm_horz'] * np.cos(ADCP['Heading'].values * np.pi / 180) * deltat).isel(time=_gd)
-
-    ## Lat and Lon from glider - affected by DAC which fucks things up
-    Lon = ADCP['Longitude'].isel(time=_gd).values
-    Lon = Lon * (40075000 * np.cos(np.deg2rad(np.nanmedian(ADCP['Latitude'].values))) / 360)
-    Lat = ADCP['Latitude'].isel(time=_gd).values
-    Lat = Lat * 111319.444
-    Lon = np.gradient(Lon)  # Lon[np.abs(Lon) > 5] = 0;
-    Lat = np.gradient(Lat)  # Lat[np.abs(Lat) > 5] = 0;
-    Lon = np.nancumsum(Lon)
-    Lat = np.nancumsum(Lat)
-
-    plt.figure(figsize=(10, 10))
-    # plt.scatter(Lon, Lat, 20, ADCP['Pressure'].isel(time=_gd).values)
-    # plt.colorbar()
-    plt.plot(e.cumsum(skipna=True), n.cumsum(skipna=True), '-b', alpha=0.5, linewidth=5,
-             label='Horz speed through water (4 beam and pitch)')
-    plt.plot(E.cumsum(skipna=True), N.cumsum(skipna=True), '-r', alpha=0.5, linewidth=5, label='ADCP E & N')
-    plt.plot(vg_e.cumsum(skipna=True), vg_n.cumsum(skipna=True), '-g', alpha=0.5, linewidth=5, label='Flight model')
     plt.legend()
 
     plt.figure()
@@ -1137,6 +1097,50 @@ def calcENUfromXYZ(ADCP, glider, options):
     plt.clim(np.array([-1, 1]) * 0.1)
 
     return ADCP
+
+
+def plot_subsurface_movement(ADCP, glider):
+    _gd = (ADCP['Pressure'].values > 5) & (np.abs(ADCP['profileNum'] - 150) < 10)
+    ##### PLOT 2
+    deltat = np.append(np.diff(ADCP['time'].values.astype('float') / 1e9), np.NaN)
+
+    ## 3 beam E and N velocity (Opposite because glider travel is opposite to what it "sees")
+    E = -(ADCP['E'].mean(dim='gridded_bin') * deltat).isel(time=_gd)
+    N = -(ADCP['N'].mean(dim='gridded_bin') * deltat).isel(time=_gd)
+
+    ## 4 beam estimates, based on total speed through water from 4 beam adcp, adjusted iwth pitch and AOA=5 deg estimate
+    spd_thr_water = np.sqrt(ADCP['X4'] ** 2 + ADCP['Y4'] ** 2 + ADCP['ZZ4'] ** 2).mean('bin')
+    hspd = np.cos(np.deg2rad(np.abs(ADCP['Pitch']) + 5)) * spd_thr_water
+    angle = np.deg2rad(90 - ADCP['Heading'])
+    e = hspd * np.cos(angle)
+    n = hspd * np.sin(angle)
+    e = (e * deltat).isel(time=_gd)
+    n = (n * deltat).isel(time=_gd)
+    ## Like 4 beam estimate but using flightmodel horizontal velocity
+    ADCP['fm_horz'] = (
+    'time', interp(glider.date_float.values, glider['speed_horz'].values, ADCP['time'].values.astype('float')))
+    vg_e = (ADCP['fm_horz'] * np.sin(ADCP['Heading'].values * np.pi / 180) * deltat).isel(
+        time=_gd)  # ADCP['Heading'].values * np.pi/180
+    vg_n = (ADCP['fm_horz'] * np.cos(ADCP['Heading'].values * np.pi / 180) * deltat).isel(time=_gd)
+
+    ## Lat and Lon from glider - affected by DAC which fucks things up
+    Lon = ADCP['Longitude'].isel(time=_gd).values
+    Lon = Lon * (40075000 * np.cos(np.deg2rad(np.nanmedian(ADCP['Latitude'].values))) / 360)
+    Lat = ADCP['Latitude'].isel(time=_gd).values
+    Lat = Lat * 111319.444
+    Lon = np.gradient(Lon)  # Lon[np.abs(Lon) > 5] = 0;
+    Lat = np.gradient(Lat)  # Lat[np.abs(Lat) > 5] = 0;
+    Lon = np.nancumsum(Lon)
+    Lat = np.nancumsum(Lat)
+
+    plt.figure(figsize=(10, 10))
+    # plt.scatter(Lon, Lat, 20, ADCP['Pressure'].isel(time=_gd).values)
+    # plt.colorbar()
+    plt.plot(e.cumsum(skipna=True), n.cumsum(skipna=True), '-b', alpha=0.5, linewidth=5,
+             label='Horz speed through water (4 beam and pitch)')
+    plt.plot(E.cumsum(skipna=True), N.cumsum(skipna=True), '-r', alpha=0.5, linewidth=5, label='ADCP E & N')
+    plt.plot(vg_e.cumsum(skipna=True), vg_n.cumsum(skipna=True), '-g', alpha=0.5, linewidth=5, label='Flight model')
+    plt.legend()
 
 
 def verify_calcENUfromXYZ(ADCP):

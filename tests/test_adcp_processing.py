@@ -2,7 +2,6 @@ import xarray as xr
 import numpy as np
 from pathlib import Path
 import sys
-import gsw
 module_dir = Path(__file__).parent.parent.absolute()
 sys.path.append(str(module_dir))
 from seaexplorertools import process_adcp
@@ -24,7 +23,7 @@ def test_processing():
         'correctZZshear': False,
         'ADCP_regrid_correlation_threshold': 20,
     }
-    ADCP, data, ADCP_settings, options = process_adcp.load_adcp_glider_data(adcp_path, glider_pqt_path, options)
+    ADCP, data, options = process_adcp.load_adcp_glider_data(adcp_path, glider_pqt_path, options)
     data = data[data.diveNum < 100]
     ADCP = ADCP.where(ADCP.time < data.Timestamp.values[-1]).dropna(dim="time", how="all")
     ADCP = process_adcp.remapADCPdepth(ADCP, options)
@@ -33,7 +32,7 @@ def test_processing():
     ADCP = process_adcp.remove_outliers(ADCP, options)
     ADCP = process_adcp.correct_shear(ADCP, options)
     ADCP = process_adcp.correct_backscatter(ADCP, data)
-    ADCP = process_adcp.regridADCPdata(ADCP, ADCP_settings, options)
+    ADCP = process_adcp.regridADCPdata(ADCP, options)
     ADCP = process_adcp.calcXYZfrom3beam(ADCP, options)
     ADCP = process_adcp.calcENUfromXYZ(ADCP, data, options)
 
@@ -56,6 +55,9 @@ def test_processing():
     for var in list(ds_min):
         assert np.allclose(ds_min[var], ds_min_test[var], equal_nan=True, atol=1e-7, rtol=1e-3)
 
+    # integrate the gridded shear from here
+
+    process_adcp.plot_subsurface_movement(ADCP, data)
     data = process_adcp.get_DAC(ADCP, data)
     dE, dN, dT = process_adcp.getSurfaceDrift(data)
     ADCP = process_adcp.bottom_track(ADCP, adcp_path, options)
