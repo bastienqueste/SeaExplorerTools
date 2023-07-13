@@ -8,7 +8,6 @@ sys.path.append(str(module_dir))
 from seaexplorertools import process_adcp
 
 
-
 def test_processing():
     adcp_path = 'ADCP_refactoring_test_files/sea045_M44.ad2cp.00000_1.nc'
     glider_pqt_path = 'ADCP_refactoring_test_files/Skag_test.pqt'
