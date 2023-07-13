@@ -959,7 +959,7 @@ def regridADCPdata(ADCP, options, depth_offsets=None):
         plt.subplot(144)
         plt.pcolormesh(ADCP['depth_offset'], ADCP['time'][idx], ADCP['V4'][idx, :])
         if options['plots_directory']:
-            save_plot(options['plots_directory'], 'regridded_depth_ffset_bins')
+            save_plot(options['plots_directory'], 'regridded_depth_offset_bins')
     return ADCP
 
 
@@ -1023,8 +1023,9 @@ def calcXYZfrom3beam(ADCP, options):
 
         plt.figure(figsize=(25, 5))
         plt.subplot(131)
-        _ = plt.hist(X[upcasts, :].flatten(), np.linspace(-1, 1, 100) / 2, color='b', alpha=0.4)
-        _ = plt.hist(X[~upcasts, :].flatten(), np.linspace(-1, 1, 100) / 2, color='y', alpha=0.4)
+        _ = plt.hist(X[upcasts, :].flatten(), np.linspace(-1, 1, 100) / 2, color='b', alpha=0.4, label="upcasts")
+        _ = plt.hist(X[~upcasts, :].flatten(), np.linspace(-1, 1, 100) / 2, color='y', alpha=0.4, label="downcasts")
+        plt.legend()
         plt.axvline(0)
         plt.title('Both X histograms should more or less overlap, and more importantly: be negative')
 
@@ -1032,6 +1033,7 @@ def calcXYZfrom3beam(ADCP, options):
         _ = plt.hist(Y[upcasts, :].flatten(), np.linspace(-1, 1, 100) / 5, color='b', alpha=0.4)
         _ = plt.hist(Y[~upcasts, :].flatten(), np.linspace(-1, 1, 100) / 5, color='y', alpha=0.4)
         plt.axvline(0)
+        plt.xlabel("Relative velocity (m s$^{-1})$")
         plt.title('Both Y histograms should more or less overlap')
 
         plt.subplot(133)
@@ -1039,8 +1041,10 @@ def calcXYZfrom3beam(ADCP, options):
         _ = plt.hist(Z[~upcasts, :].flatten(), np.linspace(-1, 1, 100) / 10, color='y', alpha=0.4)
         plt.axvline(0)
         plt.title('Both Z histograms should be opposite')
-
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'xyz_relative_velocity_histograms')
         plt.figure(figsize=(9, 9))
+        plt.title("difference between 3 beam and  beam velocity estimates")
         plt.subplot(411)
         _ = plt.hist(ADCP['X'].mean(dim='gridded_bin').values.flatten() - ADCP['X4'].mean(dim='bin').values.flatten(),
                      np.linspace(-1, 1, 100) / 20, color='r', alpha=0.5)
@@ -1061,7 +1065,9 @@ def calcXYZfrom3beam(ADCP, options):
         plt.subplot(414)
         _ = plt.hist(ADCP['ZZ4'].mean(dim='bin').values.flatten() - ADCP['Z4'].mean(dim='bin').values.flatten(),
                      np.linspace(-1, 1, 100) / 20, color='r', alpha=0.5)
-
+        plt.xlabel("Velocity difference (m s$^{-1}$)")
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], '3_beam_vs_4_beam velocity')
     plog('Calculating X,Y,Z from isobaric 3-beam measurements.')
 
     if options['debug_plots']:
@@ -1069,7 +1075,11 @@ def calcXYZfrom3beam(ADCP, options):
         plt.plot(np.nansum(~np.isnan(ADCP['X']), 0), ':b')
         plt.plot(np.nansum(~np.isnan(ADCP['Y']), 0), '-y')
         plt.plot(np.nansum(~np.isnan(ADCP['Z']), 0), ':r')
-
+        plt.legend(('X', 'Y', 'Z'))
+        plt.xlabel("gridded bin")
+        plt.ylabel("number of velocity estimates")
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'velocity_estimates_gridded_bins')
         plt.figure(figsize=(20, 5))
         ADCP['X'].differentiate(coord='depth_offset').mean(dim='time').plot()
         ADCP['Y'].differentiate(coord='depth_offset').mean(dim='time').plot()
@@ -1077,6 +1087,8 @@ def calcXYZfrom3beam(ADCP, options):
         plt.legend(('X', 'Y', 'Z'))
         plt.axhline(0, color='k')
         plt.ylim(np.array([-1, 1]) * 1.5e-3)
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'xyz_velocity_shear_gridded_bins')
 
         plt.figure(figsize=(20, 40))
 
@@ -1084,16 +1096,19 @@ def calcXYZfrom3beam(ADCP, options):
 
         plt.subplot(131)
         plt.pcolormesh(ADCP['depth_offset'], ADCP['time'][idx], ADCP['X'][idx, :])
-        plt.colorbar(location='top')
+        plt.colorbar(location='top', label="X")
         plt.clim([0, -0.8])
         plt.subplot(132)
         plt.pcolormesh(ADCP['depth_offset'], ADCP['time'][idx], ADCP['Y'][idx, :])
-        plt.colorbar(location='top')
+        plt.colorbar(location='top', label="Y")
         plt.clim([-0.1, 0.1])
+        plt.xlabel("Distance from ADCP (m)")
         plt.subplot(133)
         plt.pcolormesh(ADCP['depth_offset'], ADCP['time'][idx], ADCP['Z'][idx, :])
-        plt.colorbar(location='top')
+        plt.colorbar(location='top', label="Z")
         plt.clim([-0.1, 0.1])
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'xyz_relative_velocity')
     return ADCP
 
 
@@ -1138,14 +1153,18 @@ def calcENUfromXYZ(ADCP, glider, options):
     dP = np.gradient(ADCP.isel(time=_gd)['Depth'].values, ADCP.isel(time=_gd)['time'].astype('float') / 1e9)
     if options['debug_plots']:
         plt.figure(figsize=(10, 3))
-        plt.plot(dP, '-k', alpha=0.5, label='dP/dt')
+        plt.plot(dP, '-k', alpha=0.5, label='dz/dt')
         plt.plot(U, ':r', alpha=0.5, label='ADCP U')
         plt.ylim([-0.3, 0.3])
         plt.legend()
+        plt.ylabel("vertical speed (m s$^{-1}$)")
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'vertical_speed_comparison')
 
         plt.figure()
         plt.scatter(ADCP['Longitude'].isel(time=_gd).values, ADCP['Latitude'].isel(time=_gd).values)
-
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'underwater_location')
     ADCP['Sh_E'] = (['time', 'gridded_bin'],
                     ADCP['E'].differentiate('gridded_bin').values
                     )
@@ -1169,9 +1188,12 @@ def calcENUfromXYZ(ADCP, glider, options):
         plt.figure(figsize=(25, 12))
         plt.pcolormesh(XI, YI, SHEm)
         plt.gca().invert_yaxis()
-        plt.colorbar()
+        plt.colorbar(label="northward vleocity shear")
         plt.clim(np.array([-1, 1]) * 0.1)
-
+        plt.ylabel("depth (m)")
+        plt.xlabel("profile number")
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'underwater_location')
     return ADCP
 
 
@@ -1218,7 +1240,7 @@ def plot_subsurface_movement(ADCP, glider):
     plt.legend()
 
 
-def verify_calcENUfromXYZ(ADCP):
+def verify_calcENUfromXYZ(ADCP, options):
     plt.figure(figsize=(12, 7))
 
     PD = (ADCP['Pitch'].values < 0) & (ADCP['Depth'].values > 20)
@@ -1241,7 +1263,9 @@ def verify_calcENUfromXYZ(ADCP):
     _ = plt.hist(ADCP.isel(time=PU)['U'].values.flatten(), np.linspace(-1, 1, 200) / 2, color='b')
     plt.axvline(0)
     plt.title('Glider climbing so expect U negative')
-
+    plt.xlabel("Relative velocity (m s$^{-1}$)")
+    if options['plots_directory']:
+        save_plot(options['plots_directory'], 'ENU_velocity_check')
     _gd = (ADCP['Pressure'].values > 10)
 
     PD = (ADCP.isel(time=_gd)['Pitch'].values < 0) & (ADCP.isel(time=_gd)['Depth'].values > 20)
@@ -1257,24 +1281,28 @@ def verify_calcENUfromXYZ(ADCP):
 
     plt.figure(figsize=(20, 7))
     plt.subplot(221)
-    _ = plt.hist(dP, bins, color='r', alpha=0.5)
-    _ = plt.hist(U, bins, color='b', alpha=0.5)
+    _ = plt.hist(dP, bins, color='r', alpha=0.5, label="dz/dt")
+    _ = plt.hist(U, bins, color='b', alpha=0.5, label="U from ADCP")
+    plt.xlabel("Velocity (m s$^{-1}$)")
 
     plt.subplot(223)
-    _ = plt.hist((dP - U)[PD], bins / 10, density=True, color='b', alpha=0.5)
-    _ = plt.hist((dP - U)[PU], bins / 10, density=True, color='r', alpha=0.5)
+    _ = plt.hist((dP - U)[PD], bins / 10, density=True, color='b', alpha=0.5, label="pitch > 20")
+    _ = plt.hist((dP - U)[PU], bins / 10, density=True, color='r', alpha=0.5, label="pitch < -20")
+    plt.xlabel("dz/dt - U (m s$^{-1}$)")
     plt.axvline(np.nanmean((dP - U)[PD]), color='b')
     plt.axvline(np.nanmean((dP - U)[PU]), color='r')
     plt.axvline(0, color='k')
-
-    plt.subplot(122)
+    if options['plots_directory']:
+        save_plot(options['plots_directory'], 'vertical_speed_compare')
 
     plt.figure(figsize=(20, 8))
     plt.scatter(T, D, 5, dP - U, cmap=cmo.balance)
-    plt.colorbar()
+    plt.colorbar(label="dz/dt - U (m s$^{-1}$)")
     plt.clim([bins[0] / 10, bins[-1] / 10])
     plt.gca().invert_yaxis()
-
+    plt.ylabel("Depth (m)")
+    if options['plots_directory']:
+        save_plot(options['plots_directory'], 'vertical_speed_compare_pcolor')
 
 def get_DAC(ADCP, glider, options):
     ## Calculate full x-y dead reckoning during each dive
@@ -1560,31 +1588,37 @@ def grid_shear_data(ADCP, glider, options):
         ADCP.Sh_E.values[x, :].flatten(),
         xi=1, yi=5, fn='count')
     if options['debug_plots']:
-        plt.figure(figsize=(45, 20))
+        max_depth = int(ADCP.bin_depth.max()) + 10
+        plt.figure(figsize=(25, 10))
 
         plt.subplot(221)
         plt.pcolormesh(XI, YI, SHEs / np.sqrt(SHEn))
-        plt.colorbar()
-        # plt.clim([0,300])
-        plt.ylim([0, 500])
+        plt.colorbar(label="normalised std dev eastward velocity shear")
+        plt.clim([0, 0.002])
+        plt.ylim([0, max_depth])
         plt.gca().invert_yaxis()
 
         plt.subplot(223)
         plt.pcolormesh(XI, YI, SHEm, cmap=cmo.balance)
-        plt.colorbar()
-        plt.ylim([0, 500])
+        plt.colorbar(label="mean eastward velocity shear")
+        plt.ylim([0, max_depth])
         plt.clim([-0.05, 0.05])
         plt.gca().invert_yaxis()
+        plt.xlabel("profile number")
+        plt.ylabel("depth (m)")
 
         plt.subplot(224)
         plt.pcolormesh(XI, YI, SHEn)
-        plt.colorbar()
-        plt.ylim([0, 500])
+        plt.colorbar(label="northward velocity shear values per bin")
+        plt.ylim([0, max_depth])
         # plt.clim([0,0.01])
         plt.gca().invert_yaxis()
 
         plt.subplot(222)
         _ = plt.hist(SHEs.flatten(), np.linspace(0, 0.05, 100))
+        plt.xlabel("standard deviation of eastward shear")
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'velocity_shear_gridding')
 
     yaxis = np.arange(0, np.nanmax(np.ceil(glider.pressure.values)), y_res)
     xaxis = glider.date_float.groupby(glider.profile_number).agg('mean').index
