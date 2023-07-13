@@ -13,6 +13,7 @@ import seaborn as sns
 import cmocean.cm as cmo
 import json
 from urllib import request
+from pathlib import Path
 
 warnings.filterwarnings(action='ignore', message='Mean of empty slice')
 warnings.filterwarnings(action='ignore', message='invalid value encountered in divide')
@@ -40,9 +41,18 @@ sns.set(font='Franklin Gothic Book',
             'ytick.color': 'dimgrey',
             'ytick.direction': 'out',
             'ytick.left': False,
-            'ytick.right': False},
+            'ytick.right': False,
+            'axes.labelsize': 18,
+            'legend.fontsize': 16,},
         font_scale=1)
 y_res = 1
+plot_num = 0
+
+
+def save_plot(plot_dir, plot_name):
+    global plot_num
+    plot_num += 1
+    plt.savefig(f"{plot_dir}/{str(plot_num).zfill(2)}_{plot_name}.png")
 
 
 def get_declination(data, key):
@@ -185,6 +195,12 @@ def load_adcp_glider_data(adcp_path, glider_pqt_path, options):
     else:
         options['top_mounted'] = False
     plog(f'top mounted: {options["top_mounted"]}')
+    if "plots_directory" in options.keys():
+        if not Path(options["plots_directory"]).is_dir():
+            Path(options["plots_directory"]).mkdir(parents=True)
+            plog(f'Created plots directory {options["plots_directory"]}')
+    else:
+        options["plots_directory"] = None
     return ADCP, glider, options
 
 
@@ -248,23 +264,31 @@ def remapADCPdepth(ADCP, options):
 
         plt.subplot(132)
         plt.scatter(ADCP.time[x], ADCP.Pressure[x], 5, 'k')
-        plt.scatter(times.flatten(), ADCP.isel(time=x)['D1'].values.flatten(), 15, 'g', alpha=0.1, label='Forward')
-        plt.scatter(times.flatten(), ADCP.isel(time=x)['D3'].values.flatten(), 15, 'b', alpha=0.1, label='Aft')
+        plt.scatter(times.flatten(), ADCP.isel(time=x)['D1'].values.flatten(), 15, c="C0",  alpha=0.1)
+        plt.scatter(times.flatten(), ADCP.isel(time=x)['D3'].values.flatten(), 15, c="C1", alpha=0.1)
         plt.plot(ADCP.time[x], ADCP.Pressure[x], 'k')
+        plt.scatter(times.flatten()[0], ADCP.isel(time=x)['D1'].values.flatten()[0], 15, c="C0", label='Forward')
+        plt.scatter(times.flatten()[0], ADCP.isel(time=x)['D3'].values.flatten()[0], 15, c="C1", label='Aft')
+        plt.ylabel('Pressure (dbar)')
         plt.legend()
-
         plt.ylim([-5, 40])
         plt.gca().invert_yaxis()
 
         plt.subplot(133)
         plt.scatter(ADCP.time[x], ADCP.Pressure[x], 5, 'k')
-        plt.scatter(times.flatten(), ADCP.isel(time=x)['D2'].values.flatten(), 15, 'g', alpha=0.1, label='Beam 2')
-        plt.scatter(times.flatten(), ADCP.isel(time=x)['D4'].values.flatten(), 15, 'b', alpha=0.1, label='Beam 4')
+        plt.scatter(times.flatten(), ADCP.isel(time=x)['D2'].values.flatten(), 15, c="C0", alpha=0.1)
+        plt.scatter(times.flatten(), ADCP.isel(time=x)['D4'].values.flatten(), 15, c="C1", alpha=0.1)
+        plt.scatter(times.flatten()[0], ADCP.isel(time=x)['D2'].values.flatten()[0], 15, c="C0", label='Beam 2')
+        plt.scatter(times.flatten()[0], ADCP.isel(time=x)['D4'].values.flatten()[0], 15, c="C1", label='Beam 4')
         plt.plot(ADCP.time[x], ADCP.Pressure[x], 'k')
+        plt.ylabel('Pressure (dbar)')
         plt.legend()
-
         plt.ylim([-5, 40])
         plt.gca().invert_yaxis()
+
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'cell_depth')
+
     plog('Depth calculation of cells correct. Beam 1 2 4 match on down; 3 2 4 match on up. (Tested on downward facing)')
     return ADCP
 
@@ -283,8 +307,7 @@ def _heading_correction(ADCP, glider, options):
                   'latitude=' + str(lat) + '&longitude=' + str(lon) +
                   '&date=' + str(year) + '-' + str(month) + '-' + str(day) +
                   '&resultFormat=csv')
-        import urllib
-        magdata = urllib.request.urlopen(url)
+        magdata = request.urlopen(url)
 
         string = 'empty'
         while not not string:
@@ -364,10 +387,13 @@ def _heading_correction(ADCP, glider, options):
         plt.plot(circ(cal_heading - heading(MagX.values, MagY.values, MagZ.values)), ':y', alpha=0.4)
         plt.plot(circ(ADCP.Heading - heading(MagX.values, MagY.values, MagZ.values)), '-r.', alpha=0.3)
         plt.ylim([-15, 15])
+        plt.ylabel("Heading difference")
 
         plt.subplot(434)
-        plt.plot(norm(MagX.values, MagY.values, MagZ.values), '-k')
-        plt.plot(norm(magx, magy, magz), '-b')
+        plt.plot(norm(MagX.values, MagY.values, MagZ.values), '-k', label="orignal")
+        plt.plot(norm(magx, magy, magz), '-b', label="corrected")
+        plt.legend()
+        plt.ylabel("geomagnetic strength (milliguass)")
         plt.axhline(target)
 
         plt.subplot(435)
@@ -398,6 +424,8 @@ def _heading_correction(ADCP, glider, options):
         plt.xlabel('MagX')
         plt.ylabel('MagY')
         plt.axis('square')
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'geomagnetic_compass_correction')
 
     return cal_heading
 
@@ -440,17 +468,24 @@ def remove_outliers(ADCP, options):
         plt.legend(('B1', 'B2', 'B3', 'B4'))
         plt.axhline(0, color='k')
         plt.ylim(np.array([-1, 1]) * 1.5e-3)
+        plt.ylabel("velocity shear")
+        plt.xlabel("Along beam distance (m)")
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'along_beam_shear')
 
         plt.figure(figsize=(20, 20))
 
         plt.subplot(141)
         plt.pcolormesh(ADCP['Velocity Range'], ADCP['time'], ADCP['VelocityBeam1'])
+        plt.xlabel("Along beam distance (m)")
         plt.subplot(142)
         plt.pcolormesh(ADCP['Velocity Range'], ADCP['time'], ADCP['VelocityBeam2'])
         plt.subplot(143)
         plt.pcolormesh(ADCP['Velocity Range'], ADCP['time'], ADCP['VelocityBeam3'])
         plt.subplot(144)
         plt.pcolormesh(ADCP['Velocity Range'], ADCP['time'], ADCP['VelocityBeam4'])
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'beam_velocities')
 
     # From Tanaka:
     # the velocity was 0.5 m s-1 or less,
@@ -494,39 +529,49 @@ def remove_outliers(ADCP, options):
         plt.legend(('B1', 'B2', 'B3', 'B4'))
         plt.axhline(0, color='k')
         plt.ylim(np.array([-1, 1]) * 1.5e-3)
-
+        plt.ylabel("velocity shear")
+        plt.xlabel("Along beam distance (m)")
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'along_beam_shear_post_qc')
         plt.figure(figsize=(20, 20))
 
         plt.subplot(141)
         plt.pcolormesh(ADCP['Velocity Range'], ADCP['time'], ADCP['VelocityBeam1'])
+        plt.xlabel("Along beam distance (m)")
         plt.subplot(142)
         plt.pcolormesh(ADCP['Velocity Range'], ADCP['time'], ADCP['VelocityBeam2'])
         plt.subplot(143)
         plt.pcolormesh(ADCP['Velocity Range'], ADCP['time'], ADCP['VelocityBeam3'])
         plt.subplot(144)
         plt.pcolormesh(ADCP['Velocity Range'], ADCP['time'], ADCP['VelocityBeam4'])
-
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'beam_velocities_post_qc')
     return ADCP
 
 
-def plot_data_density(ADCP):
+def plot_data_density(ADCP, options):
     agg_fn = lambda x: np.count_nonzero(np.isfinite(x))
 
     CNT, XI, YI = grid2d(
         np.tile(ADCP.profile_number.values, (len(ADCP.bin), 1)).T.flatten(),
         ADCP['D2'].values.flatten(),
         ADCP['VelocityBeam2'].values.flatten(),
-        xi=1, yi=np.arange(0, 1000, ADCP.attrs['avg_cellSize']), fn=agg_fn)
+        xi=1, yi=np.arange(0, int(ADCP['D2'].max()) + 30, ADCP.attrs['avg_cellSize']), fn=agg_fn)
 
     plt.figure(figsize=(35, 12))
     plt.subplot(121)
     plt.pcolormesh(CNT, cmap=cmo.tarn)
-    plt.colorbar()
+    plt.colorbar(label="observations per cell")
     plt.gca().invert_yaxis()
     plt.clim(0, 30)
+    plt.ylabel("depth (m)")
+    plt.xlabel("profile numer")
 
     plt.subplot(143)
-    _ = plt.hist(CNT.flatten(), np.arange(0, 20))
+    _ = plt.hist(CNT.flatten(), np.arange(0, 30))
+    plt.xlabel("number of observations per bin")
+    if options['plots_directory']:
+        save_plot(options['plots_directory'], 'data_density')
 
 
 ### Defining coordinate transform functions for the 4 beam ADCP configuration
@@ -605,14 +650,16 @@ def do_beam2xyzz(ADCP):
     return ADCP
 
 
-def plotit(ADCP):
+def plotit(ADCP, options, name):
     plt.figure(figsize=(7, 3))
     ADCP['X4'].differentiate(coord='Velocity Range').mean(dim='time').plot()
     ADCP['Y4'].differentiate(coord='Velocity Range').mean(dim='time').plot()
     ADCP['Z4'].differentiate(coord='Velocity Range').mean(dim='time').plot()
     ADCP['ZZ4'].differentiate(coord='Velocity Range').mean(dim='time').plot()
     plt.legend(('X', 'Y', 'Z', 'ZZ'))
-    plt.ylim(np.array([-1, 1]) * 1.5e-3)
+    plt.ylim(np.array([-1, 1]) * 2e-3)
+    if options['plots_directory']:
+        save_plot(options['plots_directory'], name)
 
 
 def _shear_correction(ADCP, var, correct=True):
@@ -707,7 +754,7 @@ def _shear_correction(ADCP, var, correct=True):
 def correct_shear(ADCP, options):
     ADCP = do_beam2xyzz(ADCP)
     if options["debug_plots"]:
-        plotit(ADCP)
+        plotit(ADCP, options, "xyz_shear")
 
     if options['correctZZshear']: ADCP = do_beam2xyzz(ADCP); _shear_correction(ADCP, 'ZZ4'); ADCP = do_xyzz2beam(ADCP);
     if options['correctZshear']: ADCP = do_beam2xyzz(ADCP); _shear_correction(ADCP, 'Z4'); ADCP = do_xyzz2beam(ADCP);
@@ -715,7 +762,8 @@ def correct_shear(ADCP, options):
     if options['correctXshear']: ADCP = do_beam2xyzz(ADCP); _shear_correction(ADCP, 'X4'); ADCP = do_xyzz2beam(ADCP);
 
     if (options['correctZZshear'] or options['correctZshear'] or options['correctYshear'] or options[
-        'correctXshear']) and options["debug_plots"]: plotit(ADCP);
+        'correctXshear']) and options["debug_plots"]: plotit(ADCP, options, "xyz_shear_post_correction");
+    
     return ADCP
 
 
@@ -799,8 +847,12 @@ def correct_backscatter(ADCP, glider, options):
                 ADCP['AmplitudeBeam' + beam] + 2 * ADCP['AcousticAttenuation'] * ADCP[
             'BeamRange' + beam]).values)  # + 20 int(particule attenuation,range)
     if options['debug_plots']:
-        ADCP['AmplitudeBeam1'].mean('time').plot(color='k')
-        ADCP['AmplitudeNew1'].mean('time').plot(color='r')
+        ADCP['AmplitudeBeam1'].mean('time').plot(color='k', label="original")
+        ADCP['AmplitudeNew1'].mean('time').plot(color='r', label="corrected")
+        plt.legend()
+        plt.ylabel("Return amplitude (dB)")
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'backscatter_amplitude_correction')
     return ADCP
 
 
@@ -829,6 +881,12 @@ def regridADCPdata(ADCP, options, depth_offsets=None):
             [plt.plot(ADCP['Correlation Range'].values, means[x] - stds[x], ':r') for x in range(4)]
             plt.axvline(max_bin, color='g')
             plt.title('Bin correlations')
+            plt.ylabel("Correlation (%)")
+            plt.xlabel("Along beam distance (m)")
+            plt.plot(ADCP['Correlation Range'].values, means[0], '-k', label="mean")
+            plt.plot(ADCP['Correlation Range'].values, means[0] - stds[0], ':r', label="mean ± std.dev")
+            if options['plots_directory']:
+                save_plot(options['plots_directory'], 'bin_correlations')
 
         return np.arange(0, max_distance + bin_size, bin_size / 2) * direction
 
@@ -885,19 +943,23 @@ def regridADCPdata(ADCP, options, depth_offsets=None):
         plt.legend(('V1', 'V2', 'V3', 'V4'))
         plt.axhline(0, color='k')
         plt.ylim(np.array([-1, 1]) * 1.5e-3)
-
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'velocity_shear')
         plt.figure(figsize=(20, 40))
 
         idx = np.arange(30000)
 
         plt.subplot(141)
         plt.pcolormesh(ADCP['depth_offset'], ADCP['time'][idx], ADCP['V1'][idx, :])
+        plt.xlabel("depth offset (m)")
         plt.subplot(142)
         plt.pcolormesh(ADCP['depth_offset'], ADCP['time'][idx], ADCP['V2'][idx, :])
         plt.subplot(143)
         plt.pcolormesh(ADCP['depth_offset'], ADCP['time'][idx], ADCP['V3'][idx, :])
         plt.subplot(144)
         plt.pcolormesh(ADCP['depth_offset'], ADCP['time'][idx], ADCP['V4'][idx, :])
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'regridded_depth_ffset_bins')
     return ADCP
 
 
