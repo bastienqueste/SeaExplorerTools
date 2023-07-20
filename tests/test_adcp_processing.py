@@ -46,16 +46,15 @@ def test_processing():
     ds_min_test = xr.open_dataset("tests/test_files/ds_out_min.nc")
     for var in list(ds_min):
         assert np.allclose(ds_min[var], ds_min_test[var], equal_nan=True, atol=1e-7, rtol=1e-3)
-
     # integrate the gridded shear from here
     
     extra_data = pd.read_parquet(glider_pqt_path)
+    extra_data.index = extra_data.Timestamp
     data["speed_vert"] = extra_data["speed_vert"]
     data["speed_horz"] = extra_data["speed_horz"]
     data["DeadReckoning"] = extra_data["DeadReckoning"]
     data["NAV_RESOURCE"] = extra_data["NAV_RESOURCE"]
     data["diveNum"] = extra_data["diveNum"]
-
     data = process_adcp.get_DAC(ADCP, data, options)
     dE, dN, dT = process_adcp.getSurfaceDrift(data, options)
     ADCP = process_adcp.bottom_track(ADCP, adcp_path, options)

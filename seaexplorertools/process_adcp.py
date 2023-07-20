@@ -96,6 +96,8 @@ def load(parquet_file):
     data["soundspeed"] = gsw.sound_speed(SA, CT, p)
     data = data.rename(columns={"LEGATO_PRESSURE": "pressure", "Timestamp": "time", "profileNum": "profile_number",
                                 "Declination": "declination"})
+    data.index = data.time
+    data.index.name = None
     return data
 
 
@@ -1349,11 +1351,11 @@ def get_DAC(ADCP, glider, options):
     didx = didx.astype(int)
 
     surf_lat = glider.latitude.values[sidx]
-    surf_lon = glider.longitude[sidx]
+    surf_lon = glider.longitude.values[sidx]
     surf_time = t[sidx]
 
-    dive_lat = glider.latitude[didx]
-    dive_lon = glider.longitude[didx]
+    dive_lat = glider.latitude.values[didx]
+    dive_lon = glider.longitude.values[didx]
     dive_time = t[didx]
 
     dr_e = np.zeros(np.shape(dnum)) * np.NaN
