@@ -949,7 +949,8 @@ def regridADCPdata(ADCP, options, depth_offsets=None):
             save_plot(options['plots_directory'], 'velocity_shear')
         plt.figure(figsize=(20, 40))
 
-        idx = np.arange(30000)
+        points = min(30000, len(ADCP['time']))
+        idx = np.arange(points)
 
         plt.subplot(141)
         plt.pcolormesh(ADCP['depth_offset'], ADCP['time'][idx], ADCP['V1'][idx, :])
@@ -1457,6 +1458,10 @@ def getSurfaceDrift(glider, options):
 
 
 def bottom_track(ADCP, adcp_path, options):
+    if options["top_mounted"]:
+        plog('ERROR: ADCP is top mounted. Not processing bottom track data')
+        return ADCP
+
     def sin(x):
         return np.sin(np.deg2rad(x))
 
@@ -1467,6 +1472,7 @@ def bottom_track(ADCP, adcp_path, options):
     # If we subtract BT velocity from XYZ
     # then we get speed of water
     BT = xr.open_mfdataset(adcp_path, group='Data/AverageBT')
+    BT = BT.where(BT.time < ADCP.time.values[-1]).dropna(dim="time", how="all")
 
     thresh = 12
 
@@ -1723,45 +1729,46 @@ def reference_shear(ADCP, glider, dE, dN, dT, xaxis, yaxis, taxis, options):
             plt.legend(('Surf. drift ' + letter, 'Near surf. ADCP ' + letter))
             plt.ylim([-0.5, 0.5])
 
-            ## PLOT 5
-            plt.subplot(6, 2, pstep + 11)
+            if "BT_E" in list(ADCP):
+                ## PLOT 5
+                plt.subplot(6, 2, pstep + 11)
 
-            indices = np.flip(np.cumsum(np.flip(np.full_like(V, 1) * np.isfinite(V), axis=0), axis=0), axis=0)
-            indices[indices > 10] = np.NaN
-            indices[np.isfinite(indices)] = 1
-            bottom_V = np.nanmean(V * indices, axis=0)
-            plt.plot(taxis, RunningMean(bottom_V, 1), '-r', alpha=0.8)
+                indices = np.flip(np.cumsum(np.flip(np.full_like(V, 1) * np.isfinite(V), axis=0), axis=0), axis=0)
+                indices[indices > 10] = np.NaN
+                indices[np.isfinite(indices)] = 1
+                bottom_V = np.nanmean(V * indices, axis=0)
+                plt.plot(taxis, RunningMean(bottom_V, 1), '-r', alpha=0.8)
 
-            ind = np.arange(len(ADCP['time']))  # np.isfinite(ADCP['BT_'+letter].values)
-            bt_t = ADCP['time'].isel(time=ind).values
-            bt = (ADCP[letter] - ADCP['BT_' + letter]).isel(time=ind).mean('gridded_bin').values
-            bt_std = (ADCP[letter] - ADCP['BT_' + letter]).isel(time=ind).std('gridded_bin').values
+                ind = np.arange(len(ADCP['time']))  # np.isfinite(ADCP['BT_'+letter].values)
+                bt_t = ADCP['time'].isel(time=ind).values
+                bt = (ADCP[letter] - ADCP['BT_' + letter]).isel(time=ind).mean('gridded_bin').values
+                bt_std = (ADCP[letter] - ADCP['BT_' + letter]).isel(time=ind).std('gridded_bin').values
 
-            bt_smooth = 30
-            plt.plot(bt_t, RunningMean(bt, bt_smooth), '-k', marker='.', alpha=0.3)
-            plt.ylim([-0.15, 0.15])
-            plt.legend(('ADCP near bottom ' + letter, 'Bottom track ' + letter))
+                bt_smooth = 30
+                plt.plot(bt_t, RunningMean(bt, bt_smooth), '-k', marker='.', alpha=0.3)
+                plt.ylim([-0.15, 0.15])
+                plt.legend(('ADCP near bottom ' + letter, 'Bottom track ' + letter))
 
-            ## PLOT 2
-            plt.subplot(6, 2, pstep + 5)
-            plt.plot(taxis, np.nanmean(V, axis=0) - np.nanmean(DAC, axis=0), '-k', alpha=0.8, linewidth=1)
+                ## PLOT 2
+                plt.subplot(6, 2, pstep + 5)
+                plt.plot(taxis, np.nanmean(V, axis=0) - np.nanmean(DAC, axis=0), '-k', alpha=0.8, linewidth=1)
 
-            if pstep == 0:
-                plt.plot(pd.to_datetime(dT[_gd]),
-                         dE[_gd] - interp(taxis[np.isfinite(V_surf)].values.astype('float'),
-                                          V_surf[np.isfinite(V_surf)],
-                                          dT[_gd]), '-g', alpha=0.8)
-            else:
-                plt.plot(pd.to_datetime(dT[_gd]),
-                         dN[_gd] - interp(taxis[np.isfinite(V_surf)].values.astype('float'),
-                                          V_surf[np.isfinite(V_surf)],
-                                          dT[_gd]), '-g', alpha=0.8)
+                if pstep == 0:
+                    plt.plot(pd.to_datetime(dT[_gd]),
+                             dE[_gd] - interp(taxis[np.isfinite(V_surf)].values.astype('float'),
+                                              V_surf[np.isfinite(V_surf)],
+                                              dT[_gd]), '-g', alpha=0.8)
+                else:
+                    plt.plot(pd.to_datetime(dT[_gd]),
+                             dN[_gd] - interp(taxis[np.isfinite(V_surf)].values.astype('float'),
+                                              V_surf[np.isfinite(V_surf)],
+                                              dT[_gd]), '-g', alpha=0.8)
 
-            plt.plot(bt_t, RunningMean(bt, bt_smooth) - interp(taxis.values.astype('float'), RunningMean(bottom_V, 1),
-                                                               bt_t.astype('float')), ':r', marker='.', alpha=0.5)
+                plt.plot(bt_t, RunningMean(bt, bt_smooth) - interp(taxis.values.astype('float'), RunningMean(bottom_V, 1),
+                                                                   bt_t.astype('float')), ':r', marker='.', alpha=0.5)
 
-            plt.legend(('DAC error ' + letter, 'Drift error ' + letter, 'BT error ' + letter))
-            plt.ylim([-0.2, 0.2])
+                plt.legend(('DAC error ' + letter, 'Drift error ' + letter, 'BT error ' + letter))
+                plt.ylim([-0.2, 0.2])
     return out
 
 
