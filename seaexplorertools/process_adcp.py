@@ -2,6 +2,7 @@ import warnings
 from glob import glob
 from tqdm import tqdm
 from datetime import datetime as dt
+import datetime
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -89,6 +90,18 @@ def load(parquet_file):
                 "LEGATO_PRESSURE",
                 ]
     data = data[sel_cols]
+    time_ms = data.Timestamp.values
+    if time_ms.dtype != '<M8[ns]':
+        divisor = 1e3
+        if time_ms.dtype == '<M8[us]':
+            divisor = 1e6
+        time_float = time_ms.astype('float') / divisor
+        base = datetime.datetime(1970, 1, 1)
+        time_ms = []
+        for seconds in time_float:
+            time_ms.append(base + datetime.timedelta(seconds=seconds + 0.0000001))
+        time_nanoseconds = pd.to_datetime(time_ms)
+        data["Timestamp"] = time_nanoseconds
     data["date_float"] = data['Timestamp'].values.astype('float')
     p = data['LEGATO_PRESSURE']
     SA = gsw.conversions.SA_from_SP(data.salinity, p, data.longitude, data.latitude)
@@ -148,23 +161,25 @@ def load_adcp_glider_data(adcp_path, glider_pqt_path, options):
     ADCP = xr.open_mfdataset(adcp_path, group='Data/Average')
     ADCP_settings = xr.open_mfdataset(glob(adcp_path)[0], group='Config')
     ADCP.attrs = ADCP_settings.attrs
-
+    adcp_time_float = ADCP.time.values.astype('float')
+    #if ADCP.time.dtype == '<M8[ns]':
+    #    adcp_time_float = adcp_time_float / 1e6
     plog('Finished loading ADCP data')
     # Coordinates
     ADCP = ADCP.assign_coords(
         Latitude=("time",
-                  interp(glider['time'].values.astype('float'), glider['latitude'],
-                         ADCP.time.values.astype('float'))))
+                  interp(glider['date_float'], glider['latitude'],
+                         adcp_time_float)))
     ADCP = ADCP.assign_coords(
         Longitude=("time",
-                   interp(glider['time'].values.astype('float'), glider['longitude'],
-                          ADCP.time.values.astype('float'))))
+                   interp(glider['date_float'], glider['longitude'],
+                          adcp_time_float)))
 
     # Profile and depth
     ADCP = ADCP.assign_coords(
         profile_number=("time",
-                        np.round(interp(glider['time'].values.astype('float'), glider['profile_number'],
-                                        ADCP.time.values.astype('float')))))
+                        np.round(interp(glider['date_float'], glider['profile_number'],
+                                        adcp_time_float))))
     ADCP = ADCP.assign_coords(
         Depth=("time", -gsw.z_from_p(ADCP['Pressure'].values, ADCP['Latitude'].values)))
 
@@ -1196,11 +1211,11 @@ def calcENUfromXYZ(ADCP, glider, options):
         plt.ylabel("depth (m)")
         plt.xlabel("profile number")
         if options['plots_directory']:
-            save_plot(options['plots_directory'], 'underwater_location')
+            save_plot(options['plots_directory'], 'northward_velocity_shear')
     return ADCP
 
 
-def plot_subsurface_movement(ADCP, glider):
+def plot_subsurface_movement(ADCP, glider, options):
     _gd = (ADCP['Pressure'].values > 5) & (np.abs(ADCP['profile_number'] - 150) < 10)
     ##### PLOT 2
     deltat = np.append(np.diff(ADCP['time'].values.astype('float') / 1e9), np.NaN)
@@ -1241,6 +1256,8 @@ def plot_subsurface_movement(ADCP, glider):
     plt.plot(E.cumsum(skipna=True), N.cumsum(skipna=True), '-r', alpha=0.5, linewidth=5, label='ADCP E & N')
     plt.plot(vg_e.cumsum(skipna=True), vg_n.cumsum(skipna=True), '-g', alpha=0.5, linewidth=5, label='Flight model')
     plt.legend()
+    if options['plots_directory']:
+        save_plot(options['plots_directory'], 'speed_through_water')
 
 
 def verify_calcENUfromXYZ(ADCP, options):
@@ -1410,6 +1427,8 @@ def get_DAC(ADCP, glider, options):
         plt.scatter(X, Y, 100, N, cmap=cmo.balance)
         plt.colorbar()
         plt.title('North')
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'DAC')
     return glider
 
 
@@ -1453,7 +1472,8 @@ def getSurfaceDrift(glider, options):
         plt.subplot(212)
         plt.plot(pd.to_datetime(dT), dN, '.-r')
         plt.title('V')
-
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'surface_drift')
     return dE, dN, dT
 
 
@@ -1769,6 +1789,8 @@ def reference_shear(ADCP, glider, dE, dN, dT, xaxis, yaxis, taxis, options):
 
                 plt.legend(('DAC error ' + letter, 'Drift error ' + letter, 'BT error ' + letter))
                 plt.ylim([-0.2, 0.2])
+            if options['plots_directory']:
+                save_plot(options['plots_directory'], 'reference_shear')
     return out
 
 
@@ -1834,7 +1856,7 @@ def grid_data(ADCP, glider, out, xaxis, yaxis):
     return out
 
 
-def verify_depth_bias(out, yaxis, E='ADCP_E', N='ADCP_N'):
+def verify_depth_bias(out, yaxis, options, E='ADCP_E', N='ADCP_N'):
     north = np.gradient(out['latitude'], axis=1) > 0
     south = np.gradient(out['latitude'], axis=1) < 0
 
@@ -1846,14 +1868,15 @@ def verify_depth_bias(out, yaxis, E='ADCP_E', N='ADCP_N'):
     bins = np.linspace(-1, 1, 100) * 0.5
 
     variables = [E, N]
-
-    plt.figure(figsize=(20, 7))
+    if options['debug_plots']:
+        plt.figure(figsize=(20, 7))
 
     SF = drange / 3
 
     for idx, var in enumerate(variables):
-        plt.subplot(1, 3, idx + 1)
-        plt.axvline(0, color='k')
+        if options['debug_plots']:
+            plt.subplot(1, 3, idx + 1)
+            plt.axvline(0, color='k')
 
         for idx, d in enumerate(depths):
             depth = (np.abs(out['Pressure'] - d) < drange)
@@ -1874,23 +1897,23 @@ def verify_depth_bias(out, yaxis, E='ADCP_E', N='ADCP_N'):
 
             N[N == 0] = np.NaN
             S[S == 0] = np.NaN
+            if options['debug_plots']:
+                plt.fill_between(bins[1:], SF * N - float(d), -float(d), color='r', alpha=0.5)
+                plt.fill_between(bins[1:], SF * S - float(d), -float(d), color='b', alpha=0.5)
+                plt.plot(bins[1:], SF * N - float(d), '-r')
+                plt.plot(bins[1:], SF * S - float(d), '-b')
 
-            plt.fill_between(bins[1:], SF * N - float(d), -float(d), color='r', alpha=0.5)
-            plt.fill_between(bins[1:], SF * S - float(d), -float(d), color='b', alpha=0.5)
-            plt.plot(bins[1:], SF * N - float(d), '-r')
-            plt.plot(bins[1:], SF * S - float(d), '-b')
-
-            plt.plot([Nm - 2 * Nse, Nm + 2 * Nse], np.array([1, 1]) * -float(d), '-k', linewidth=3, alpha=1)
-            plt.plot([Sm - 2 * Sse, Sm + 2 * Sse], np.array([1, 1]) * -float(d), '-k', linewidth=3, alpha=1)
-            # plt.plot([Nm,Sm],np.array([1,1])*-float(d),'k',marker='.',linestyle='none')
-
-        plt.ylabel('Depth (m) / ' + str(SF) + '*PDF')
-        plt.xlabel('Velocity')
-        plt.legend(('Zero', 'Northward travel', 'Southward travel'))
-        plt.title(var)
-
-    plt.subplot(133)
-    plt.axvline(0, color='k')
+                plt.plot([Nm - 2 * Nse, Nm + 2 * Nse], np.array([1, 1]) * -float(d), '-k', linewidth=3, alpha=1)
+                plt.plot([Sm - 2 * Sse, Sm + 2 * Sse], np.array([1, 1]) * -float(d), '-k', linewidth=3, alpha=1)
+                # plt.plot([Nm,Sm],np.array([1,1])*-float(d),'k',marker='.',linestyle='none')
+        if options['debug_plots']:
+            plt.ylabel('Depth (m) / ' + str(SF) + '*PDF')
+            plt.xlabel('Velocity')
+            plt.legend(('Zero', 'Northward travel', 'Southward travel'))
+            plt.title(var)
+    if options['debug_plots']:
+        plt.subplot(133)
+        plt.axvline(0, color='k')
 
     for idx, d in enumerate(depths):
         depth = (np.abs(out['Pressure'] - d) < drange)
@@ -1911,19 +1934,21 @@ def verify_depth_bias(out, yaxis, E='ADCP_E', N='ADCP_N'):
 
         N[N == 0] = np.NaN
         S[S == 0] = np.NaN
+        if options['debug_plots']:
+            plt.fill_between(bins[1:], SF * N - float(d), -float(d), color='r', alpha=0.5)
+            plt.fill_between(bins[1:], SF * S - float(d), -float(d), color='b', alpha=0.5)
+            plt.plot(bins[1:], SF * N - float(d), '-r')
+            plt.plot(bins[1:], SF * S - float(d), '-b')
 
-        plt.fill_between(bins[1:], SF * N - float(d), -float(d), color='r', alpha=0.5)
-        plt.fill_between(bins[1:], SF * S - float(d), -float(d), color='b', alpha=0.5)
-        plt.plot(bins[1:], SF * N - float(d), '-r')
-        plt.plot(bins[1:], SF * S - float(d), '-b')
-
-        plt.plot([Nm - 2 * Nse, Nm + 2 * Nse], np.array([1, 1]) * -float(d), '-k', linewidth=3, alpha=1)
-        plt.plot([Sm - 2 * Sse, Sm + 2 * Sse], np.array([1, 1]) * -float(d), '-k', linewidth=3, alpha=1)
-
-    plt.ylabel('Depth (m) / ' + str(SF) + '*PDF')
-    plt.xlabel('Velocity')
-    plt.legend(('Zero', 'Northward travel', 'Southward travel'))
-    plt.title('MAG')
+            plt.plot([Nm - 2 * Nse, Nm + 2 * Nse], np.array([1, 1]) * -float(d), '-k', linewidth=3, alpha=1)
+            plt.plot([Sm - 2 * Sse, Sm + 2 * Sse], np.array([1, 1]) * -float(d), '-k', linewidth=3, alpha=1)
+    if options['debug_plots']:
+        plt.ylabel('Depth (m) / ' + str(SF) + '*PDF')
+        plt.xlabel('Velocity')
+        plt.legend(('Zero', 'Northward travel', 'Southward travel'))
+        plt.title('MAG')
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'verify_depth_bias')
 
 
 def calc_bias(out, yaxis, taxis, days, options):
@@ -1968,9 +1993,10 @@ def calc_bias(out, yaxis, taxis, days, options):
         plt.subplot(133)
         plt.plot(np.nanvar(np.sqrt(ADCP_E_old ** 2 + ADCP_N_old ** 2), axis=1), yaxis, '-r')
         plt.plot(np.nanvar(np.sqrt(out['ADCP_E'] ** 2 + out['ADCP_N'] ** 2), axis=1), yaxis, '-g')
-
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'calc_bias')
     if options['debug_plots']:
-        verify_depth_bias(out, yaxis, E='ADCP_E', N='ADCP_N')
+        verify_depth_bias(out, yaxis, options, E='ADCP_E', N='ADCP_N')
 
         plt.figure(figsize=(20, 20))
         ## PLOT 1
@@ -1995,6 +2021,8 @@ def calc_bias(out, yaxis, taxis, days, options):
         plt.xlabel('Yo number')
         plt.xlabel('Depth')
         plt.title('Northward velocity (m.s-1)')
+        if options['plots_directory']:
+            save_plot(options['plots_directory'], 'calc_bias_2')
     return out
 
 
@@ -2004,11 +2032,14 @@ def make_dataset(out):
 
     ds_dict = {}
     for key, val in out.items():
+        if key in ["depth_bin", "profile_num"]:
+            continue
         ds_dict[key] = (("depth_bin", "profile_num",), val)
     coords_dict = {"profile_num": ("profile_num", profiles),
                    "depth_bin": ("depth_bin", depth_bins)
                    }
     ds = xr.Dataset(data_vars=ds_dict, coords=coords_dict)
+    ds["profile_datetime"] = ("profile_num", pd.to_datetime(ds.date_float.mean(dim="depth_bin").values))
     return ds
 
 
