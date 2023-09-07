@@ -47,9 +47,10 @@ def test_processing():
     for var in list(ds_min):
         assert np.allclose(ds_min[var], ds_min_test[var], equal_nan=True, atol=1e-7, rtol=1e-3)
     # integrate the gridded shear from here
-    
+
     extra_data = pd.read_parquet(glider_pqt_path)
-    extra_data.index = extra_data.Timestamp
+    extra_data = extra_data[extra_data.profileNum < 199]
+    extra_data.index = data.index
     data["speed_vert"] = extra_data["speed_vert"]
     data["speed_horz"] = extra_data["speed_horz"]
     data["DeadReckoning"] = extra_data["DeadReckoning"]
