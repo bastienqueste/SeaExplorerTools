@@ -2054,7 +2054,7 @@ def shear_from_adcp(adcp_path, glider_pqt_path, options):
     ADCP = regridADCPdata(ADCP, options)
     ADCP = calcXYZfrom3beam(ADCP, options)
     ADCP = calcENUfromXYZ(ADCP, data, options)
-    return ADCP
+    return ADCP, data
 
 
 def grid_shear(ADCP, data, options):
@@ -2066,6 +2066,7 @@ def grid_shear(ADCP, data, options):
 
 def velocity_from_shear(adcp_path, glider_pqt_path, options, data, ADCP):
     extra_data = pd.read_parquet(glider_pqt_path)
+    extra_data.index = data.index
     data["speed_vert"] = extra_data["speed_vert"]
     data["speed_horz"] = extra_data["speed_horz"]
     data["DeadReckoning"] = extra_data["DeadReckoning"]
